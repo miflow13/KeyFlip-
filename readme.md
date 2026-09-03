@@ -1,65 +1,43 @@
-**FEDORA LINUX — EVERYDAY CHEAT SHEET**
+# Fedora Internal Keyboard Toggle
 
-For standard Fedora Workstation/KDE. Atomic editions such as Silverblue use different system update commands.
+A simple script to enable or disable a supported laptop’s internal keyboard on Fedora GNOME. Works with Wayland and X11.
 
-**Basics**
-- `sudo command` → run as administrator
-- `command --help` → quick help
-- `man command` → manual; press `q` to exit
-- `clear` → clear terminal
+Supports standard **i8042/AT internal keyboards**. If no supported keyboard is found, the script exits without making changes.
 
-**Move around**
-- `pwd` → show current folder
-- `ls` → list files
-- `ls -lah` → detailed list, including hidden files
-- `cd folder` → enter folder
-- `cd ..` → go up one folder
-- `cd ~` → go home
-- `cd -` → return to previous folder
+## Install
 
-**Files & folders**
-- `mkdir folder` → create folder
-- `touch file.txt` → create empty file
-- `cp file copy` → copy file
-- `cp -r folder copy` → copy folder
-- `mv old new` → move or rename
-- `rm -i file` → delete file, asking first
-- `rmdir folder` → delete empty folder
-- `cat file.txt` → display file
-- `less file.txt` → scroll through file; `q` quits
-- `nano file.txt` → edit file, if Nano is installed
+Download `internal-keyboard`, open a terminal in the folder containing it, and run:
 
-**Install & update software**
-- `sudo dnf upgrade --refresh` → update system packages
-- `dnf search word` → find packages
-- `dnf info package` → package details
-- `sudo dnf install package` → install
-- `sudo dnf remove package` → uninstall
-- `flatpak update` → update Flatpak apps
-- `flatpak list` → list installed Flatpaks
+```bash
+sudo install -m 755 internal-keyboard /usr/local/bin/internal-keyboard
+```
 
-**System & network**
-- `cat /etc/fedora-release` → Fedora version
-- `df -h` → disk space
-- `free -h` → memory usage
-- `top` → running processes; `q` quits
-- `ip -br addr` → IP addresses
-- `nmcli device status` → network status
-- `systemctl --failed` → failed services
-- `reboot` → restart
-- `poweroff` → shut down
+## Test first
 
-**Terminal shortcuts**
-- `Tab` → complete command or filename
-- `↑ / ↓` → previous/next command
-- `Ctrl+C` → stop current command
-- `Ctrl+L` → clear screen
-- `Ctrl+R` → search command history
-- `Ctrl+Shift+C / V` → copy/paste in most terminals
+Disable the internal keyboard for about 15 seconds, then automatically enable it:
 
-**Remember**
-- Replace `file`, `folder`, and `package` with actual names.
-- Names are case-sensitive: `Notes` ≠ `notes`.
-- Quote spaces: `cd "My Folder"`.
-- `sudo` passwords stay invisible while typing.
-- `rm` deletes directly; it does not use the Trash.
+```bash
+sudo internal-keyboard test
+```
+
+## Usage
+
+```bash
+# Switch between enabled and disabled
+sudo internal-keyboard toggle
+
+# Disable the internal keyboard
+sudo internal-keyboard disable
+
+# Enable the internal keyboard
+sudo internal-keyboard enable
+
+# Check current status
+internal-keyboard status
+```
+
+## Recovery
+
+Have an external keyboard available before disabling the internal keyboard indefinitely. Run `sudo internal-keyboard enable` to restore it.
+
+Restarting the computer also restores the keyboard. The script makes no persistent configuration changes.
