@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Fedora GNOME: toggle a standard i8042/AT internal keyboard.
+# No persistent configuration changes. A reboot restores normal operation.
+set -euo pipefail
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+usage() {
+    echo 'Usage: sudo internal-keyboard {toggle|enable|disable|test|status}'
+    echo 'test disables for about 15 seconds, then automatically enables.'
+}
+action=${1:-toggle}
+case "$action" in
+    toggle|enable|disable|test|status) ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+esac
+[[ $# -le 1 ]] || { usage >&2; exit 2; }
+
+# The port description survives unbinding; do not guess from event numbers.
+ports=()
+for port in /sys/bus/serio/devices/serio*; do
+    [[ -r "$port/description" ]] || continue
+    [[ $(<"$port/description") == 'i8042 KBD port' ]] && ports+=("$port")
+done
+if [[ ${#ports[@]} -ne 1 ]]; then
+    echo 'No single supported i8042 internal keyboard found. Nothing changed.' >&2
+    echo 'This script does not support internal USB or I2C keyboards.' >&2
+    exit 1
+fi
+port=${ports[0]}
+id=${port##*/}
+[[ $id =~ ^serio[0-9]+$ ]] || exit 1
+driver=/sys/bus/serio/drivers/atkbd
+state=disabled
+if [[ -L "$port/driver" ]]; then
+    if [[ $(readlink -f "$port/driver") != "$driver" ]]; then
+        echo 'Keyboard port is using an unexpected driver. Nothing changed.' >&2
+        exit 1
+    fi
+    state=enabled
+fi
+if [[ $action == status ]]; then
+    echo "Internal keyboard: $state ($id)"
+    exit 0
+fi
+if [[ $EUID -ne 0 ]]; then
+    echo "Run with sudo: sudo bash \"$0\" $action" >&2
+    exit 1
+fi
+[[ -w "$driver/bind" && -w "$driver/unbind" ]] || {
+    echo 'Keyboard driver controls are unavailable. Nothing changed.' >&2
+    exit 1
+}
+# Serialize changes, including the automatic restore.
+exec 9>/run/internal-keyboard-toggle.lock
+flock -x 9
+# Refresh state after acquiring the lock.
+if [[ -L "$port/driver" ]]; then state=enabled; else state=disabled; fi
+if [[ $action == toggle ]]; then
+    if [[ $state == enabled ]]; then action=disable; else action=enable; fi
+fi
+if [[ $action == test ]]; then
+    [[ $state == enabled ]] || { echo 'Enable the keyboard before testing.'; exit 1; }
+    # Schedule recovery before disabling. The job survives a closed terminal.
+    systemd-run --quiet --collect --on-active=15s --timer-property=AccuracySec=1s \
+        /bin/bash -c 'exec 9>/run/internal-keyboard-toggle.lock; flock -x 9; if [[ ! -L /sys/bus/serio/devices/$1/driver ]]; then printf "%s" "$1" > /sys/bus/serio/drivers/atkbd/bind; fi' \
+        keyboard-restore "$id"
+    printf '%s' "$id" > "$driver/unbind"
+    echo 'Internal keyboard disabled. Automatic restore in about 15 seconds.'
+elif [[ $action == disable ]]; then
+    [[ $state == disabled ]] || printf '%s' "$id" > "$driver/unbind"
+    echo 'Internal keyboard disabled. Use an external keyboard to enable it, or reboot.'
+else
+    [[ $state == enabled ]] || printf '%s' "$id" > "$driver/bind"
+    echo 'Internal keyboard enabled.'
+fi
