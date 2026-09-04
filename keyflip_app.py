@@ -23,18 +23,18 @@ class KeyboardWindow(Gtk.ApplicationWindow):
     def __init__(self, application):
         super().__init__(application=application, title=APP_NAME)
         self.set_icon_name("io.github.miflow13.KeyFlip")
-        self.set_default_size(640, 390)
+        self.set_default_size(520, 360)
         self.set_resizable(False)
 
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        outer.set_margin_top(20)
-        outer.set_margin_bottom(20)
-        outer.set_margin_start(24)
-        outer.set_margin_end(24)
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        outer.set_margin_top(24)
+        outer.set_margin_bottom(22)
+        outer.set_margin_start(28)
+        outer.set_margin_end(28)
 
-        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         header_icon = Gtk.Image.new_from_icon_name("input-keyboard-symbolic")
-        header_icon.set_pixel_size(28)
+        header_icon.set_pixel_size(22)
         header_icon.add_css_class("header-icon")
         header.append(header_icon)
         header_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
@@ -45,17 +45,23 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         header_text.append(heading)
         header_text.append(subtitle)
         header.append(header_text)
+        header_text.set_hexpand(True)
+        self.refresh_button = Gtk.Button.new_from_icon_name("view-refresh-symbolic")
+        self.refresh_button.add_css_class("flat")
+        self.refresh_button.add_css_class("circular")
+        self.refresh_button.set_valign(Gtk.Align.CENTER)
+        self.refresh_button.set_tooltip_text("Refresh keyboard status")
+        self.refresh_button.connect("clicked", lambda _: self.refresh_status())
+        header.append(self.refresh_button)
         outer.append(header)
 
         self.status_frame = Gtk.Frame()
-        self.status_frame.add_css_class("status-card")
+        self.status_frame.add_css_class("device-card")
+        card_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         status_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-        status_row.set_margin_top(13)
-        status_row.set_margin_bottom(13)
-        status_row.set_margin_start(18)
-        status_row.set_margin_end(18)
+        status_row.add_css_class("status-row")
         self.status_icon = Gtk.Image.new_from_icon_name("content-loading-symbolic")
-        self.status_icon.set_pixel_size(38)
+        self.status_icon.set_pixel_size(32)
         self.status_icon.add_css_class("status-icon")
         self.status_icon_stack = Gtk.Overlay()
         self.status_icon_stack.set_size_request(46, 42)
@@ -80,27 +86,14 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         status_box.append(self.state_label)
         status_box.append(self.detail_label)
         status_row.append(status_box)
-        self.status_frame.set_child(status_row)
-        outer.append(self.status_frame)
-
-        safety_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        safety_box.add_css_class("safety-note")
-        safety_icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
-        safety_icon.set_pixel_size(18)
-        safety_box.append(safety_icon)
-        safety_label = Gtk.Label(
-            label="Keep an external keyboard connected while the internal keyboard is disabled.",
-            xalign=0,
-        )
-        safety_label.set_wrap(True)
-        safety_label.set_hexpand(True)
-        safety_box.append(safety_label)
+        card_content.append(status_row)
+        card_content.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
         switch_card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18)
-        switch_card.add_css_class("switch-card")
+        switch_card.add_css_class("control-row")
         switch_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
         switch_text.set_hexpand(True)
-        switch_title = Gtk.Label(label="Keyboard toggle", xalign=0)
+        switch_title = Gtk.Label(label="Internal keyboard", xalign=0)
         switch_title.add_css_class("title-3")
         self.switch_hint = Gtk.Label(label="Checking keyboard state…", xalign=0)
         self.switch_hint.add_css_class("dim-label")
@@ -109,23 +102,33 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         switch_card.append(switch_text)
         self.toggle_switch = Gtk.Switch()
         self.toggle_switch.set_valign(Gtk.Align.CENTER)
-        self.toggle_switch.set_size_request(146, 74)
-        self.toggle_switch.add_css_class("large-switch")
+        self.toggle_switch.add_css_class("compact-switch")
         self.toggle_switch.set_tooltip_text("Enable or disable the internal keyboard")
         self.toggle_switch.connect("state-set", self.toggle_keyboard)
         switch_card.append(self.toggle_switch)
-        outer.append(switch_card)
-        outer.append(safety_box)
+        card_content.append(switch_card)
+        self.status_frame.set_child(card_content)
+        outer.append(self.status_frame)
 
-        self.refresh_button = Gtk.Button(label="Refresh status")
-        self.refresh_button.add_css_class("flat")
-        self.refresh_button.connect("clicked", lambda _: self.refresh_status())
-        outer.append(self.refresh_button)
+        safety_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
+        safety_box.add_css_class("safety-note")
+        safety_icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
+        safety_icon.set_pixel_size(16)
+        safety_box.append(safety_icon)
+        safety_label = Gtk.Label(
+            label="Keep an external keyboard connected while this one is off.",
+            xalign=0,
+        )
+        safety_label.set_wrap(True)
+        safety_label.set_hexpand(True)
+        safety_box.append(safety_label)
+        outer.append(safety_box)
 
         self.set_child(outer)
         self.keyboard_enabled = None
         self.updating_switch = False
         self.busy = False
+        self.safety_dialog = None
         self.refresh_status()
         self.status_timer = GLib.timeout_add_seconds(1, self.sync_status)
         self.connect("close-request", self.stop_status_sync)
@@ -212,11 +215,104 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         action = "enable" if requested_state else "disable"
         if requested_state == self.keyboard_enabled:
             return False
+
+        if action == "disable":
+            external = self.run_command("external-list")
+            external_connected = external.returncode == 0 and bool(external.stdout.strip())
+            # Always confirm a manual disable. Device receivers can expose
+            # keyboard endpoints even when no usable keyboard is connected.
+            # Present after state-set finishes because synchronous modal
+            # presentation from this signal is unreliable in GTK 4.
+            GLib.idle_add(self.show_disable_warning, external_connected)
+            return True
+
+        self.start_toggle(action, requested_state)
+        # Keep the thumb in its confirmed position until the privileged action succeeds.
+        return True
+
+    def show_disable_warning(self, external_connected):
+        if self.safety_dialog is not None:
+            self.safety_dialog.present()
+            return GLib.SOURCE_REMOVE
+
+        dialog = Gtk.Window(
+            title="Keyboard safety",
+            transient_for=self,
+            modal=True,
+            resizable=False,
+        )
+        dialog.set_default_size(420, -1)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        content.set_margin_top(24)
+        content.set_margin_bottom(20)
+        content.set_margin_start(24)
+        content.set_margin_end(24)
+
+        warning_icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
+        warning_icon.set_pixel_size(36)
+        warning_icon.add_css_class("warning-dialog-icon")
+        content.append(warning_icon)
+
+        title = Gtk.Label(
+            label=(
+                "Disable internal keyboard?"
+                if external_connected
+                else "No external keyboard detected"
+            )
+        )
+        title.add_css_class("title-2")
+        content.append(title)
+
+        message = Gtk.Label(
+            label=(
+                "Make sure your external keyboard is ready. You will need it "
+                "to turn the internal keyboard back on."
+                if external_connected
+                else "Connect an external keyboard before disabling the internal "
+                "keyboard, or you may be unable to type."
+            )
+        )
+        message.set_wrap(True)
+        message.set_justify(Gtk.Justification.CENTER)
+        message.add_css_class("dim-label")
+        content.append(message)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        actions.set_halign(Gtk.Align.END)
+        cancel = Gtk.Button(label="Cancel")
+        cancel.connect("clicked", lambda _button: self.close_safety_dialog())
+        confirm = Gtk.Button(label="Disable Anyway")
+        confirm.add_css_class("destructive-action")
+        confirm.connect("clicked", lambda _button: self.confirm_unsafe_disable())
+        actions.append(cancel)
+        actions.append(confirm)
+        content.append(actions)
+
+        dialog.set_child(content)
+        dialog.connect("close-request", self.on_safety_dialog_closed)
+        self.safety_dialog = dialog
+        dialog.present()
+        return GLib.SOURCE_REMOVE
+
+    def close_safety_dialog(self):
+        if self.safety_dialog is not None:
+            self.safety_dialog.destroy()
+            self.safety_dialog = None
+
+    def on_safety_dialog_closed(self, _dialog):
+        self.safety_dialog = None
+        return False
+
+    def confirm_unsafe_disable(self):
+        self.close_safety_dialog()
+        if self.keyboard_enabled:
+            self.start_toggle("disable", False)
+
+    def start_toggle(self, action, requested_state):
         self.play_toggle_sound(requested_state)
         self.set_busy(True)
         threading.Thread(target=self.finish_toggle, args=(action,), daemon=True).start()
-        # Keep the thumb in its confirmed position until the privileged action succeeds.
-        return True
 
     def finish_toggle(self, action):
         result = self.run_command(action, privileged=True)
@@ -282,20 +378,23 @@ def load_css():
         }
         .header-icon {
             color: @accent_color;
-            background: alpha(@accent_color, 0.12);
-            border-radius: 12px;
-            padding: 8px;
+            background: alpha(@accent_color, 0.14);
+            border-radius: 11px;
+            padding: 9px;
         }
-        .status-card {
-            border-radius: 14px;
+        .device-card {
+            border-radius: 16px;
             border: 1px solid @borders;
             background: @card_bg_color;
-            box-shadow: 0 2px 8px alpha(black, 0.08);
+            box-shadow: 0 3px 12px alpha(black, 0.08);
         }
-        .status-card.error {
+        .device-card.error {
             border-color: @error_color;
             background: alpha(@error_color, 0.08);
         }
+        .status-row { padding: 20px; }
+        .control-row { padding: 14px 20px; }
+        .device-card separator { background: @borders; }
         .status-icon { color: @accent_color; }
         .status-badge {
             color: white;
@@ -304,34 +403,30 @@ def load_css():
             border-radius: 12px;
             padding: 2px;
         }
-        .status-card.error .status-icon { color: @error_color; }
+        .device-card.error .status-icon { color: @error_color; }
         .state-enabled { color: #2e9b55; }
         .state-disabled { color: #d94b4b; }
         .safety-note {
-            color: @window_fg_color;
-            background: alpha(@warning_color, 0.12);
-            border-radius: 10px;
-            padding: 9px 12px;
+            color: alpha(@window_fg_color, 0.72);
+            padding: 2px 5px;
         }
-        .safety-note image { color: @warning_color; }
-        .switch-card {
-            background: @card_bg_color;
-            border: 1px solid @borders;
-            border-radius: 14px;
-            padding: 10px 18px;
+        .safety-note image {
+            color: @warning_color;
+            opacity: 0.85;
         }
-        switch.large-switch {
-            min-width: 132px;
-            min-height: 64px;
-            border-radius: 36px;
+        .warning-dialog-icon { color: @warning_color; }
+        switch.compact-switch {
+            min-width: 50px;
+            min-height: 28px;
+            border-radius: 16px;
         }
-        switch.large-switch slider {
-            min-width: 56px;
-            min-height: 56px;
-            border-radius: 30px;
-            margin: 4px;
+        switch.compact-switch slider {
+            min-width: 22px;
+            min-height: 22px;
+            border-radius: 12px;
+            margin: 3px;
         }
-        button { border-radius: 8px; }
+        button { border-radius: 10px; }
         .dim-label { opacity: 0.68; }
     """)
     Gtk.StyleContext.add_provider_for_display(

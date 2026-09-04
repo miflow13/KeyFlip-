@@ -7,9 +7,26 @@
 
 Useful when you're using an external keyboard and want to avoid accidental input from the built-in one.
 
+## Screenshots
+
+### Keyboard status and control
+
+![KeyFlip keyboard status and control](screenshots/keyflip-status-control.png)
+
+### KeyFlip app
+
+![KeyFlip app with the keyboard enabled](screenshots/keyflip-app-enabled.png)
+
+### Enabled keyboard state
+
+![KeyFlip enabled keyboard state](screenshots/keyflip-enabled.png)
+
 ## Features
 
 - Toggle the internal laptop keyboard on or off
+- Automatically disable it when a USB or Bluetooth keyboard connects, then
+  re-enable it when the last external keyboard disconnects
+- Warn before manual disabling when no external keyboard is detected
 - Works on **Wayland** and **X11**
 - Does not affect external USB keyboards
 - Does not affect Bluetooth keyboards

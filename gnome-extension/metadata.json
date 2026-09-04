@@ -1,8 +1,8 @@
 {
   "uuid": "keyflip@miflow13.github.io",
   "name": "KeyFlip",
-  "description": "Toggle the internal laptop keyboard from the GNOME top bar.",
+  "description": "Toggle the internal laptop keyboard or disable it automatically when an external keyboard connects.",
   "shell-version": ["50"],
   "url": "https://github.com/miflow13/KeyFlip-",
-  "version": 10
+  "version": 16
 }
