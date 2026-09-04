@@ -13,7 +13,9 @@ from gi.repository import Gdk, GLib, Gtk, Pango
 APP_NAME = "KeyFlip"
 VERSION = "0.1.0-beta"
 SCRIPT = Path(__file__).resolve().with_name("keyflip-helper")
-SOUND_DIR = Path(__file__).resolve().parent / "assets" / "sounds"
+INSTALLED_SOUND_DIR = Path("/usr/share/keyflip/sounds")
+SOURCE_SOUND_DIR = Path(__file__).resolve().parent / "assets" / "sounds"
+SOUND_DIR = INSTALLED_SOUND_DIR if INSTALLED_SOUND_DIR.is_dir() else SOURCE_SOUND_DIR
 PKEXEC = "/usr/bin/pkexec"
 
 
@@ -210,7 +212,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         action = "enable" if requested_state else "disable"
         if requested_state == self.keyboard_enabled:
             return False
-        self.play_toggle_sound()
+        self.play_toggle_sound(requested_state)
         self.set_busy(True)
         threading.Thread(target=self.finish_toggle, args=(action,), daemon=True).start()
         # Keep the thumb in its confirmed position until the privileged action succeeds.
@@ -238,15 +240,15 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         GLib.idle_add(self.show_toggle_result, result.returncode, message)
 
     @staticmethod
-    def play_toggle_sound():
-        sound_file = SOUND_DIR / "toggle-on.ogg"
+    def play_toggle_sound(enabled):
+        sound_file = SOUND_DIR / ("toggle-on.ogg" if enabled else "toggle-off.ogg")
         try:
             subprocess.Popen(
                 [
                     "/usr/bin/canberra-gtk-play",
                     f"--file={sound_file}",
-                    "--description=KeyFlip toggle",
-                    "--cache-control=permanent",
+                    f"--description=KeyFlip {'on' if enabled else 'off'}",
+                    "--cache-control=never",
                 ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,

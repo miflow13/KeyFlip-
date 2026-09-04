@@ -4,7 +4,7 @@ app_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 if [[ -f "$app_dir/app.py" ]]; then
     exec python3 "$app_dir/app.py" "$@"
 fi
-for installed_app in /usr/lib/keyflip/app.py /usr/local/lib/keyflip/app.py; do
+for installed_app in /usr/libexec/keyflip/app.py /usr/lib/keyflip/app.py /usr/local/lib/keyflip/app.py; do
     if [[ -f "$installed_app" ]]; then
         exec python3 "$installed_app" "$@"
     fi

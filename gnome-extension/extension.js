@@ -1,13 +1,14 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
+import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-const HELPER = '/usr/local/lib/keyflip/keyflip-helper';
-const SOUND_DIR = '/usr/local/lib/keyflip/assets/sounds';
+const HELPER = '/usr/libexec/keyflip/keyflip-helper';
+const SOUND_DIR = '/usr/share/keyflip/sounds';
 
 const KeyFlipIndicator = GObject.registerClass(
 class KeyFlipIndicator extends St.Button {
@@ -92,21 +93,54 @@ class KeyFlipIndicator extends St.Button {
             this._busy = false;
             this._keyboardIcon.opacity = 255;
             this._refresh();
-            Main.notify(
-                success ? 'KeyFlip' : 'KeyFlip could not change the keyboard',
-                success
-                    ? `Internal keyboard ${enabling ? 'enabled' : 'disabled'}`
-                    : output
-            );
+            if (success)
+                this._showStatus(enabling);
+            else
+                Main.notify('KeyFlip could not change the keyboard', output);
             return GLib.SOURCE_REMOVE;
         });
+    }
+
+    _showStatus(enabled) {
+        const icon = Gio.icon_new_for_string(
+            `${this._extensionPath}/keyboard-${enabled ? 'enabled' : 'disabled'}.svg`
+        );
+        const label = `Keyboard ${enabled ? 'enabled' : 'disabled'}`;
+        try {
+            const osdManager = Main.osdWindowManager;
+            const monitorIndex = Main.layoutManager.primaryIndex;
+            const osdWindow = osdManager._osdWindows?.[monitorIndex];
+            const previousAlignment = osdWindow?.y_align;
+
+            // GNOME places OSDs near the bottom by default. Center only the
+            // KeyFlip message, then restore the normal position once it fades.
+            if (osdWindow)
+                osdWindow.y_align = Clutter.ActorAlign.CENTER;
+
+            const showOsd = osdManager.showOne ?? osdManager.show;
+            showOsd.call(osdManager, monitorIndex, icon, label, null);
+
+            if (osdWindow) {
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2500, () => {
+                    osdWindow.y_align = previousAlignment;
+                    return GLib.SOURCE_REMOVE;
+                });
+            }
+        } catch (_error) {
+            Main.notify('KeyFlip', label);
+        }
     }
 
     _playSound(enabling) {
         const sound = `${SOUND_DIR}/toggle-${enabling ? 'on' : 'off'}.ogg`;
         try {
             Gio.Subprocess.new(
-                ['/usr/bin/canberra-gtk-play', `--file=${sound}`],
+                [
+                    '/usr/bin/canberra-gtk-play',
+                    `--file=${sound}`,
+                    `--description=KeyFlip ${enabling ? 'on' : 'off'}`,
+                    '--cache-control=never',
+                ],
                 Gio.SubprocessFlags.NONE
             );
         } catch (_error) {

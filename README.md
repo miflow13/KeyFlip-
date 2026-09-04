@@ -44,10 +44,36 @@ Download and extract:
 
 `keyflip-0.1.0-beta.tar.gz`
 
-Open a terminal inside the extracted folder and run:
+Open a terminal inside the extracted folder. To install both interfaces, run:
 
 ```bash
 sudo ./install.sh
+```
+
+The GUI and GNOME Shell extension are separate front ends backed by the same
+privileged core. You can install only the interface you want:
+
+```bash
+sudo ./install.sh --gui-only
+sudo ./install.sh --extension-only
+sudo ./install.sh --core-only
+```
+
+Distribution packages use the same split:
+
+- `keyflip-core` — shared helper, Polkit policy, and sounds
+- `keyflip` — GTK 4 desktop application
+- `gnome-shell-extension-keyflip` — GNOME top-bar indicator
+
+Both front-end packages depend on `keyflip-core`, and they may be installed
+together or independently.
+
+Component-specific removal is also supported:
+
+```bash
+sudo ./uninstall.sh --gui-only
+sudo ./uninstall.sh --extension-only
+sudo ./uninstall.sh             # remove everything
 ```
 
 ## AI-assisted development

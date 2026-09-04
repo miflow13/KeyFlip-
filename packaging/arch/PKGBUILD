@@ -1,25 +1,46 @@
 # Maintainer: Miflow13 <pizzafan513 at gmail dot com>
-pkgname=keyflip
+pkgbase=keyflip
+pkgname=('keyflip-core' 'keyflip' 'gnome-shell-extension-keyflip')
 pkgver=0.1.0_beta
 pkgrel=1
 pkgdesc="Toggle a supported laptop internal keyboard on Linux"
 arch=('any')
 url="https://github.com/miflow13/KeyFlip-"
 license=('custom:proprietary')
-depends=('gtk4' 'python' 'python-gobject' 'polkit' 'util-linux' 'systemd' 'libcanberra')
-source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v0.1.0-beta.tar.gz")
+source=("$pkgbase-$pkgver.tar.gz::$url/archive/refs/tags/v0.1.0-beta.tar.gz")
 sha256sums=('387b9c741298f50fd2df079130487e456c4e190cce4fecc2ccd45fb15628a158')
 
-package() {
+prepare() {
     local source_dir="$srcdir/KeyFlip--0.1.0-beta"
-
-    sed -i 's|/usr/local/lib/keyflip/app.py|/usr/lib/keyflip/app.py|' "$source_dir/keyflip"
     sed -i 's|Exec=/usr/local/bin/keyflip|Exec=keyflip|' \
         "$source_dir/packaging/io.github.miflow13.KeyFlip.desktop"
+}
 
-    install -Dm644 "$source_dir/app.py" "$pkgdir/usr/lib/keyflip/app.py"
-    install -Dm644 "$source_dir/keyflip_app.py" "$pkgdir/usr/lib/keyflip/keyflip_app.py"
-    install -Dm755 "$source_dir/keyflip-helper" "$pkgdir/usr/lib/keyflip/keyflip-helper"
+package_keyflip-core() {
+    pkgdesc="Shared helper and resources for KeyFlip"
+    depends=('polkit' 'util-linux' 'systemd' 'libcanberra')
+    local source_dir="$srcdir/KeyFlip--0.1.0-beta"
+
+    install -Dm755 "$source_dir/keyflip-helper" \
+        "$pkgdir/usr/libexec/keyflip/keyflip-helper"
+    install -Dm644 "$source_dir/packaging/io.github.miflow13.KeyFlip.policy" \
+        "$pkgdir/usr/share/polkit-1/actions/io.github.miflow13.KeyFlip.policy"
+    install -Dm644 "$source_dir/assets/sounds/toggle-on.ogg" \
+        "$pkgdir/usr/share/keyflip/sounds/toggle-on.ogg"
+    install -Dm644 "$source_dir/assets/sounds/toggle-off.ogg" \
+        "$pkgdir/usr/share/keyflip/sounds/toggle-off.ogg"
+    install -Dm644 "$source_dir/README.md" \
+        "$pkgdir/usr/share/doc/keyflip-core/README.md"
+}
+
+package_keyflip() {
+    pkgdesc="GTK interface for controlling a laptop internal keyboard"
+    depends=('keyflip-core' 'gtk4' 'python' 'python-gobject')
+    local source_dir="$srcdir/KeyFlip--0.1.0-beta"
+
+    install -Dm644 "$source_dir/app.py" "$pkgdir/usr/libexec/keyflip/app.py"
+    install -Dm644 "$source_dir/keyflip_app.py" \
+        "$pkgdir/usr/libexec/keyflip/keyflip_app.py"
     install -Dm755 "$source_dir/keyflip" "$pkgdir/usr/bin/keyflip"
     install -Dm644 "$source_dir/assets/keyflip.png" \
         "$pkgdir/usr/share/icons/hicolor/512x512/apps/io.github.miflow13.KeyFlip.png"
@@ -27,5 +48,17 @@ package() {
         "$pkgdir/usr/share/applications/io.github.miflow13.KeyFlip.desktop"
     install -Dm644 "$source_dir/packaging/io.github.miflow13.KeyFlip.metainfo.xml" \
         "$pkgdir/usr/share/metainfo/io.github.miflow13.KeyFlip.metainfo.xml"
-    install -Dm644 "$source_dir/README.md" "$pkgdir/usr/share/doc/keyflip/README.md"
+}
+
+package_gnome-shell-extension-keyflip() {
+    pkgdesc="KeyFlip indicator for GNOME Shell"
+    depends=('keyflip-core' 'gnome-shell')
+    local source_dir="$srcdir/KeyFlip--0.1.0-beta"
+    local extension_dir="$pkgdir/usr/share/gnome-shell/extensions/keyflip@miflow13.github.io"
+
+    install -d "$extension_dir"
+    install -m644 "$source_dir/gnome-extension/extension.js" \
+        "$source_dir/gnome-extension/metadata.json" \
+        "$source_dir/gnome-extension/stylesheet.css" \
+        "$source_dir/gnome-extension/"*.svg "$extension_dir/"
 }
