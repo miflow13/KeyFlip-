@@ -1,3 +1,4 @@
+<img width="800" height="450" alt="KeyFlip demo" src="https://github.com/user-attachments/assets/4f224ba1-1f8a-47b8-b3d8-36cad5cf97ed" />
 
 
 # ✨ KeyFlip
