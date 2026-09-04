@@ -1,6 +1,3 @@
-## Screenshots
-<img width="1536" height="1023" alt="Screenshot From 2026-09-04 15-56-56" src="https://github.com/user-attachments/assets/ed68bfef-b275-4c72-8a8b-a98021579358" />
-<img width="1539" height="1023" alt="Screenshot From 2026-09-04 15-57-06" src="https://github.com/user-attachments/assets/f95e26bc-903c-453a-9ee1-946c66c41eaf" />
 
 
 # ✨ KeyFlip
@@ -19,6 +16,11 @@ Useful when you're using an external keyboard and want to avoid accidental input
 - Does not affect external USB keyboards
 - Does not affect Bluetooth keyboards
 - Simple GNOME interface
+
+  ## Screenshots
+<img width="1536" height="1023" alt="Screenshot From 2026-09-04 15-56-56" src="https://github.com/user-attachments/assets/ed68bfef-b275-4c72-8a8b-a98021579358" />
+<img width="1539" height="1023" alt="Screenshot From 2026-09-04 15-57-06" src="https://github.com/user-attachments/assets/f95e26bc-903c-453a-9ee1-946c66c41eaf" />
+
 
 ## Requirements
 
