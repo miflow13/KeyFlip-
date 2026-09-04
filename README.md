@@ -30,7 +30,7 @@ So I made one.
 
 ---
 
-## 🤖 AI-assisted, human-owned
+## 🤖 AI-assisted
 
 KeyFlip was built with help from AI tools during parts of the coding, debugging, brainstorming, documentation, and learning process.
 
