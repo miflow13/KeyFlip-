@@ -1,3 +1,4 @@
+## Screenshots
 <img width="1536" height="1023" alt="Screenshot From 2026-09-04 15-56-56" src="https://github.com/user-attachments/assets/ed68bfef-b275-4c72-8a8b-a98021579358" />
 <img width="1539" height="1023" alt="Screenshot From 2026-09-04 15-57-06" src="https://github.com/user-attachments/assets/f95e26bc-903c-453a-9ee1-946c66c41eaf" />
 
@@ -7,19 +8,6 @@
 
 Useful when you're using an external keyboard and want to avoid accidental input from the built-in one.
 
-## Screenshots
-
-### Keyboard status and control
-
-![KeyFlip keyboard status and control](screenshots/keyflip-status-control.png)
-
-### KeyFlip app
-
-![KeyFlip app with the keyboard enabled](screenshots/keyflip-app-enabled.png)
-
-### Enabled keyboard state
-
-![KeyFlip enabled keyboard state](screenshots/keyflip-enabled.png)
 
 ## Features
 
