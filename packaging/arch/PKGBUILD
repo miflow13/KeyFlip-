@@ -4,14 +4,14 @@ pkgver=0.1.0_beta
 pkgrel=1
 pkgdesc="Toggle a supported laptop internal keyboard on Linux"
 arch=('any')
-url="https://github.com/miflow13/fedora-internal-keyboard-toggler"
+url="https://github.com/miflow13/KeyFlip-"
 license=('custom:proprietary')
 depends=('gtk4' 'python' 'python-gobject' 'polkit' 'util-linux' 'systemd' 'libcanberra')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v0.1.0-beta.tar.gz")
 sha256sums=('387b9c741298f50fd2df079130487e456c4e190cce4fecc2ccd45fb15628a158')
 
 package() {
-    local source_dir="$srcdir/fedora-internal-keyboard-toggler-0.1.0-beta"
+    local source_dir="$srcdir/KeyFlip--0.1.0-beta"
 
     sed -i 's|/usr/local/lib/keyflip/app.py|/usr/lib/keyflip/app.py|' "$source_dir/keyflip"
     sed -i 's|Exec=/usr/local/bin/keyflip|Exec=keyflip|' \

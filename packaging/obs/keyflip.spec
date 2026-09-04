@@ -3,7 +3,7 @@ Version:        0.1.0
 Release:        0.beta%{?dist}
 Summary:        Toggle a supported laptop internal keyboard
 License:        LicenseRef-Proprietary
-URL:            https://github.com/miflow13/fedora-internal-keyboard-toggler
+URL:            https://github.com/miflow13/KeyFlip-
 Source0:        %{url}/archive/refs/tags/v0.1.0-beta.tar.gz#/keyflip-%{version}.tar.gz
 BuildArch:      noarch
 
@@ -20,7 +20,7 @@ KeyFlip provides a GTK 4 interface for enabling and disabling a supported
 i8042/AT laptop keyboard while leaving external keyboards available.
 
 %prep
-%autosetup -n fedora-internal-keyboard-toggler-%{version}-beta
+%autosetup -n KeyFlip--%{version}-beta
 sed -i 's|/usr/local/lib/keyflip/app.py|%{_libexecdir}/keyflip/app.py|' keyflip
 sed -i 's|Exec=/usr/local/bin/keyflip|Exec=keyflip|' \
     packaging/io.github.miflow13.KeyFlip.desktop

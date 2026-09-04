@@ -2,7 +2,7 @@ pkgbase = keyflip
 	pkgdesc = Toggle a supported laptop internal keyboard on Linux
 	pkgver = 0.1.0_beta
 	pkgrel = 1
-	url = https://github.com/miflow13/fedora-internal-keyboard-toggler
+	url = https://github.com/miflow13/KeyFlip-
 	arch = any
 	license = custom:proprietary
 	depends = gtk4
@@ -12,7 +12,7 @@ pkgbase = keyflip
 	depends = util-linux
 	depends = systemd
 	depends = libcanberra
-	source = keyflip-0.1.0_beta.tar.gz::https://github.com/miflow13/fedora-internal-keyboard-toggler/archive/refs/tags/v0.1.0-beta.tar.gz
+	source = keyflip-0.1.0_beta.tar.gz::https://github.com/miflow13/KeyFlip-/archive/refs/tags/v0.1.0-beta.tar.gz
 	sha256sums = 387b9c741298f50fd2df079130487e456c4e190cce4fecc2ccd45fb15628a158
 
 pkgname = keyflip

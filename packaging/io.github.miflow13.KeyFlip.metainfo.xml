@@ -8,7 +8,7 @@
   <description>
     <p>KeyFlip provides a simple graphical control for enabling and disabling a supported i8042 laptop keyboard on Fedora GNOME.</p>
   </description>
-  <url type="homepage">https://github.com/miflow13/fedora-internal-keyboard-toggler</url>
+  <url type="homepage">https://github.com/miflow13/KeyFlip-</url>
   <launchable type="desktop-id">io.github.miflow13.KeyFlip.desktop</launchable>
   <developer id="io.github.miflow13">
     <name>Miflow13</name>
