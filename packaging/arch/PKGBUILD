@@ -18,13 +18,15 @@ prepare() {
 
 package_keyflip-core() {
     pkgdesc="Shared helper and resources for KeyFlip"
-    depends=('polkit' 'util-linux' 'systemd' 'libcanberra')
+    depends=('polkit' 'util-linux' 'systemd' 'libcanberra' 'glib2')
     local source_dir="$srcdir/KeyFlip--0.1.0-beta"
 
     install -Dm755 "$source_dir/keyflip-helper" \
         "$pkgdir/usr/libexec/keyflip/keyflip-helper"
     install -Dm644 "$source_dir/packaging/io.github.miflow13.KeyFlip.policy" \
         "$pkgdir/usr/share/polkit-1/actions/io.github.miflow13.KeyFlip.policy"
+    install -Dm644 "$source_dir/packaging/io.github.miflow13.KeyFlip.gschema.xml" \
+        "$pkgdir/usr/share/glib-2.0/schemas/io.github.miflow13.KeyFlip.gschema.xml"
     install -Dm644 "$source_dir/assets/sounds/toggle-on.ogg" \
         "$pkgdir/usr/share/keyflip/sounds/toggle-on.ogg"
     install -Dm644 "$source_dir/assets/sounds/toggle-off.ogg" \

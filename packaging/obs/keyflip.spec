@@ -22,6 +22,7 @@ Requires:       polkit
 Requires:       util-linux
 Requires:       systemd
 Requires:       libcanberra-gtk3
+Requires:       glib2
 
 %description core
 Privileged keyboard control helper, authorization policy, and shared sounds
@@ -48,6 +49,8 @@ sed -i 's|Exec=/usr/local/bin/keyflip|Exec=keyflip|' \
 install -Dm755 keyflip-helper %{buildroot}%{_libexecdir}/keyflip/keyflip-helper
 install -Dm644 packaging/io.github.miflow13.KeyFlip.policy \
     %{buildroot}%{_datadir}/polkit-1/actions/io.github.miflow13.KeyFlip.policy
+install -Dm644 packaging/io.github.miflow13.KeyFlip.gschema.xml \
+    %{buildroot}%{_datadir}/glib-2.0/schemas/io.github.miflow13.KeyFlip.gschema.xml
 install -Dm644 assets/sounds/toggle-on.ogg \
     %{buildroot}%{_datadir}/keyflip/sounds/toggle-on.ogg
 install -Dm644 assets/sounds/toggle-off.ogg \
@@ -83,6 +86,7 @@ install -m644 gnome-extension/extension.js gnome-extension/metadata.json \
 %{_libexecdir}/keyflip/keyflip-helper
 %{_datadir}/keyflip/
 %{_datadir}/polkit-1/actions/io.github.miflow13.KeyFlip.policy
+%{_datadir}/glib-2.0/schemas/io.github.miflow13.KeyFlip.gschema.xml
 
 %files -n gnome-shell-extension-keyflip
 %{_datadir}/gnome-shell/extensions/keyflip@miflow13.github.io/

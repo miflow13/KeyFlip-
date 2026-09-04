@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-version=0.1.0-beta
+version=0.2.0-beta
 project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
@@ -20,6 +20,7 @@ install -m 644 "$project_dir/assets/sounds/"*.ogg "$bundle/assets/sounds/"
 install -m 644 "$project_dir/packaging/io.github.miflow13.KeyFlip.desktop" "$bundle/packaging/"
 install -m 644 "$project_dir/packaging/io.github.miflow13.KeyFlip.metainfo.xml" "$bundle/packaging/"
 install -m 644 "$project_dir/packaging/io.github.miflow13.KeyFlip.policy" "$bundle/packaging/"
+install -m 644 "$project_dir/packaging/io.github.miflow13.KeyFlip.gschema.xml" "$bundle/packaging/"
 install -m 644 "$project_dir/gnome-extension/extension.js" "$bundle/gnome-extension/"
 install -m 644 "$project_dir/gnome-extension/metadata.json" "$bundle/gnome-extension/"
 install -m 644 "$project_dir/gnome-extension/stylesheet.css" "$bundle/gnome-extension/"

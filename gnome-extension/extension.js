@@ -10,6 +10,7 @@ import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 
 const HELPER = '/usr/libexec/keyflip/keyflip-helper';
 const SOUND_DIR = '/usr/share/keyflip/sounds';
+const SETTINGS_SCHEMA = 'io.github.miflow13.KeyFlip';
 
 // Clutter does not expose libadwaita's SpringAnimation, so these keyframes
 // approximate SpringParams.new(0.75, 1.7, 100.0) with initial_velocity -18.8.
@@ -33,6 +34,7 @@ class KeyFlipIndicator extends St.Button {
         });
 
         this._extensionPath = extensionPath;
+        this._settings = new Gio.Settings({schema_id: SETTINGS_SCHEMA});
         this._keyboardIcon = new St.Icon({
             style_class: 'keyflip-keyboard-icon',
         });
@@ -43,14 +45,17 @@ class KeyFlipIndicator extends St.Button {
         this._externalKeyboardIds = new Set();
         this._externalKeyboardKnown = false;
         this._disconnectChecks = 0;
-        this._autoDisabled = false;
         this._checkExternalKeyboard();
         this._statusTimer = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
             1,
             () => {
-                if (!this._busy)
-                    this._refresh();
+                if (!this._busy && !this._statusCheckRunning) {
+                    this._statusCheckRunning = true;
+                    this._refresh().finally(() => {
+                        this._statusCheckRunning = false;
+                    });
+                }
                 return GLib.SOURCE_CONTINUE;
             }
         );
@@ -58,11 +63,17 @@ class KeyFlipIndicator extends St.Button {
             GLib.PRIORITY_DEFAULT,
             500,
             () => {
-                this._checkExternalKeyboard();
+                if (!this._deviceCheckRunning) {
+                    this._deviceCheckRunning = true;
+                    this._checkExternalKeyboard().finally(() => {
+                        this._deviceCheckRunning = false;
+                    });
+                }
                 return GLib.SOURCE_CONTINUE;
             }
         );
         this.connect('destroy', () => {
+            this._destroyed = true;
             if (this._statusTimer) {
                 GLib.source_remove(this._statusTimer);
                 this._statusTimer = null;
@@ -74,21 +85,37 @@ class KeyFlipIndicator extends St.Button {
         });
     }
 
-    _run(argv) {
-        try {
-            const process = Gio.Subprocess.new(
-                argv,
-                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
-            );
-            const [, stdout, stderr] = process.communicate_utf8(null, null);
-            return [process.get_successful(), (stdout || stderr || '').trim()];
-        } catch (error) {
-            return [false, error.message];
-        }
+    _runAsync(argv) {
+        return new Promise(resolve => {
+            let process;
+            try {
+                process = Gio.Subprocess.new(
+                    argv,
+                    Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
+                );
+            } catch (error) {
+                resolve([false, error.message]);
+                return;
+            }
+
+            process.communicate_utf8_async(null, null, (source, result) => {
+                try {
+                    const [, stdout, stderr] = source.communicate_utf8_finish(result);
+                    resolve([
+                        source.get_successful(),
+                        (stdout || stderr || '').trim(),
+                    ]);
+                } catch (error) {
+                    resolve([false, error.message]);
+                }
+            });
+        });
     }
 
-    _refresh() {
-        const [success, output] = this._run([HELPER, 'status']);
+    async _refresh() {
+        const [success, output] = await this._runAsync([HELPER, 'status']);
+        if (this._destroyed)
+            return;
         if (!success) {
             this._keyboardIcon.gicon = null;
             this._keyboardIcon.icon_name = 'dialog-error-symbolic';
@@ -104,15 +131,17 @@ class KeyFlipIndicator extends St.Button {
         this.accessible_name = `Internal keyboard ${this._enabled ? 'enabled' : 'disabled'}`;
     }
 
-    _toggle() {
+    async _toggle() {
         if (this._busy)
             return;
 
         // A manual choice ends the current automatic disable cycle.
-        this._autoDisabled = false;
+        this._settings.set_boolean('automatic-disable-owned', false);
         const enabling = !this._enabled;
         if (!enabling) {
-            const [success, output] = this._run([HELPER, 'external-list']);
+            const [success, output] = await this._runAsync([HELPER, 'external-list']);
+            if (this._destroyed)
+                return;
             if (!success || !output) {
                 this._confirmDisableWithoutExternalKeyboard();
                 return;
@@ -152,8 +181,10 @@ class KeyFlipIndicator extends St.Button {
         dialog.open();
     }
 
-    _checkExternalKeyboard() {
-        const [success, output] = this._run([HELPER, 'external-list']);
+    async _checkExternalKeyboard() {
+        const [success, output] = await this._runAsync([HELPER, 'external-list']);
+        if (this._destroyed)
+            return;
         if (!success)
             return;
 
@@ -161,9 +192,6 @@ class KeyFlipIndicator extends St.Button {
         const connected = keyboardIds.size > 0;
         const wasKnown = this._externalKeyboardKnown;
         const wasConnected = this._externalKeyboardIds.size > 0;
-        const keyboardAdded = [...keyboardIds].some(
-            id => !this._externalKeyboardIds.has(id)
-        );
         if (!connected && wasKnown && wasConnected) {
             this._disconnectChecks++;
             if (this._disconnectChecks < 2)
@@ -174,48 +202,47 @@ class KeyFlipIndicator extends St.Button {
         this._externalKeyboardKnown = true;
         this._externalKeyboardIds = keyboardIds;
 
-        if (connected && !wasKnown && !this._enabled) {
-            // Preserve the automatic cycle across a Shell/extension reload.
-            this._autoDisabled = true;
-        } else if (connected && (!wasKnown || keyboardAdded) &&
-                   this._enabled && !this._busy) {
+        if (!this._settings.get_boolean('automatic-mode-switching'))
+            return;
+
+        if (connected && this._enabled && !this._busy) {
             this._setEnabled(false, true);
         }
         else if (!connected && wasKnown && wasConnected &&
-                 this._autoDisabled && !this._enabled && !this._busy)
+                 this._settings.get_boolean('automatic-disable-owned') &&
+                 !this._enabled && !this._busy)
             this._setEnabled(true, true);
     }
 
-    _setEnabled(enabling, automatic = false) {
+    async _setEnabled(enabling, automatic = false) {
         this._busy = true;
         this._playSound(enabling);
         this._playToggleAnimation();
         this._keyboardIcon.opacity = 130;
 
-        GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-            const [success, output] = this._run([
-                '/usr/bin/pkexec',
-                HELPER,
-                enabling ? 'enable' : 'disable',
-            ]);
-            this._busy = false;
-            this._keyboardIcon.opacity = 255;
-            this._refresh();
-            if (success) {
-                if (automatic)
-                    this._autoDisabled = !enabling;
-                this._showStatus(enabling);
-            } else {
-                if (automatic)
-                    this._autoDisabled = false;
-                Main.notify(
-                    automatic ? `KeyFlip could not auto-${enabling ? 'enable' : 'disable'} the keyboard` :
-                        'KeyFlip could not change the keyboard',
-                    output
-                );
-            }
-            return GLib.SOURCE_REMOVE;
-        });
+        const [success, output] = await this._runAsync([
+            '/usr/bin/pkexec',
+            HELPER,
+            enabling ? 'enable' : 'disable',
+        ]);
+        if (this._destroyed)
+            return;
+        this._busy = false;
+        this._keyboardIcon.opacity = 255;
+        this._refresh();
+        if (success) {
+            if (automatic)
+                this._settings.set_boolean('automatic-disable-owned', !enabling);
+            this._showStatus(enabling);
+        } else {
+            if (automatic)
+                this._settings.set_boolean('automatic-disable-owned', false);
+            Main.notify(
+                automatic ? `KeyFlip could not auto-${enabling ? 'enable' : 'disable'} the keyboard` :
+                    'KeyFlip could not change the keyboard',
+                output
+            );
+        }
     }
 
     _playToggleAnimation() {
