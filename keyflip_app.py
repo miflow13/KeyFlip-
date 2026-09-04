@@ -23,39 +23,40 @@ class KeyboardWindow(Gtk.ApplicationWindow):
     def __init__(self, application):
         super().__init__(application=application, title=APP_NAME)
         self.set_icon_name("io.github.miflow13.KeyFlip")
-        self.set_default_size(520, 430)
+        self.set_default_size(680, 680)
         self.set_resizable(False)
 
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        outer.set_margin_top(24)
-        outer.set_margin_bottom(22)
-        outer.set_margin_start(28)
-        outer.set_margin_end(28)
-
-        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        header = Gtk.HeaderBar()
+        header.add_css_class("app-header")
+        header_title = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         header_icon = Gtk.Image.new_from_icon_name("input-keyboard-symbolic")
-        header_icon.set_pixel_size(22)
+        header_icon.set_pixel_size(24)
         header_icon.add_css_class("header-icon")
-        header.append(header_icon)
+        header_title.append(header_icon)
         header_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         heading = Gtk.Label(label=APP_NAME, xalign=0)
         heading.add_css_class("title-1")
-        subtitle = Gtk.Label(label=f"Laptop input profiles · {VERSION}", xalign=0)
+        subtitle = Gtk.Label(label="Laptop input profiles", xalign=0)
         subtitle.add_css_class("dim-label")
         header_text.append(heading)
         header_text.append(subtitle)
-        header.append(header_text)
-        header_text.set_hexpand(True)
+        header_title.append(header_text)
+        header.pack_start(header_title)
         self.refresh_button = Gtk.Button.new_from_icon_name("view-refresh-symbolic")
         self.refresh_button.add_css_class("flat")
         self.refresh_button.add_css_class("circular")
-        self.refresh_button.set_valign(Gtk.Align.CENTER)
         self.refresh_button.set_tooltip_text("Refresh keyboard status")
         self.refresh_button.connect("clicked", lambda _: self.refresh_status())
-        header.append(self.refresh_button)
-        outer.append(header)
+        header.pack_end(self.refresh_button)
+        self.set_titlebar(header)
 
-        setup_label = Gtk.Label(label="Current setup", xalign=0)
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        outer.set_margin_top(24)
+        outer.set_margin_bottom(24)
+        outer.set_margin_start(30)
+        outer.set_margin_end(30)
+
+        setup_label = Gtk.Label(label="Choose a mode", xalign=0)
         setup_label.add_css_class("section-label")
         outer.append(setup_label)
 
@@ -110,21 +111,71 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         status_box.append(self.state_label)
         status_box.append(self.detail_label)
         status_row.append(status_box)
+        self.external_badge = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=7)
+        self.external_badge.add_css_class("external-badge")
+        self.external_badge.set_valign(Gtk.Align.CENTER)
+        external_icon = Gtk.Image.new_from_icon_name("input-keyboard-symbolic")
+        external_icon.set_pixel_size(16)
+        self.external_label = Gtk.Label(label="External keyboard connected")
+        self.external_badge.append(external_icon)
+        self.external_badge.append(self.external_label)
+        self.external_badge.set_visible(False)
+        status_row.append(self.external_badge)
         card_content.append(status_row)
-        card_content.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
-
-        device_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18)
-        device_row.add_css_class("control-row")
-        device_name = Gtk.Label(label="Internal keyboard", xalign=0)
-        device_name.set_hexpand(True)
-        device_name.add_css_class("title-3")
-        self.device_state = Gtk.Label(label="Checking…")
-        self.device_state.add_css_class("state-pill")
-        device_row.append(device_name)
-        device_row.append(self.device_state)
-        card_content.append(device_row)
         self.status_frame.set_child(card_content)
         outer.append(self.status_frame)
+
+        controls_frame = Gtk.Frame()
+        controls_frame.add_css_class("controls-card")
+        controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+
+        keyboard_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        keyboard_row.add_css_class("device-row")
+        keyboard_icon = Gtk.Image.new_from_icon_name("input-keyboard-symbolic")
+        keyboard_icon.set_pixel_size(20)
+        keyboard_row.append(keyboard_icon)
+        keyboard_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        keyboard_text.set_hexpand(True)
+        keyboard_title = Gtk.Label(label="Internal keyboard", xalign=0)
+        keyboard_title.add_css_class("title-3")
+        keyboard_description = Gtk.Label(label="Control the built-in keyboard", xalign=0)
+        keyboard_description.add_css_class("dim-label")
+        keyboard_text.append(keyboard_title)
+        keyboard_text.append(keyboard_description)
+        keyboard_row.append(keyboard_text)
+        self.keyboard_switch = Gtk.Switch()
+        self.keyboard_switch.set_valign(Gtk.Align.CENTER)
+        self.keyboard_switch.connect("state-set", self.on_keyboard_switch)
+        keyboard_row.append(self.keyboard_switch)
+        self.device_state = Gtk.Label(label="Checking…")
+        self.device_state.add_css_class("device-value")
+        keyboard_row.append(self.device_state)
+        controls.append(keyboard_row)
+        controls.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+
+        touchpad_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        touchpad_row.add_css_class("device-row")
+        touchpad_icon = Gtk.Image.new_from_icon_name("input-touchpad-symbolic")
+        touchpad_icon.set_pixel_size(20)
+        touchpad_row.append(touchpad_icon)
+        touchpad_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        touchpad_text.set_hexpand(True)
+        touchpad_title = Gtk.Label(label="Touchpad", xalign=0)
+        touchpad_title.add_css_class("title-3")
+        touchpad_description = Gtk.Label(label="Planned for a future release", xalign=0)
+        touchpad_description.add_css_class("dim-label")
+        touchpad_text.append(touchpad_title)
+        touchpad_text.append(touchpad_description)
+        touchpad_row.append(touchpad_text)
+        self.touchpad_switch = Gtk.Switch(active=True, sensitive=False)
+        self.touchpad_switch.set_valign(Gtk.Align.CENTER)
+        touchpad_row.append(self.touchpad_switch)
+        touchpad_value = Gtk.Label(label="Soon")
+        touchpad_value.add_css_class("device-value")
+        touchpad_row.append(touchpad_value)
+        controls.append(touchpad_row)
+        controls_frame.set_child(controls)
+        outer.append(controls_frame)
 
         safety_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
         safety_box.add_css_class("safety-note")
@@ -184,6 +235,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         self.busy = busy
         self.laptop_mode_button.set_sensitive(not busy)
         self.desk_mode_button.set_sensitive(not busy)
+        self.keyboard_switch.set_sensitive(not busy)
         self.refresh_button.set_sensitive(not busy)
         if busy:
             self.device_state.set_text("Applying…")
@@ -201,6 +253,9 @@ class KeyboardWindow(Gtk.ApplicationWindow):
 
     def refresh_status(self):
         result = self.run_command("status")
+        external = self.run_command("external-list")
+        external_connected = external.returncode == 0 and bool(external.stdout.strip())
+        self.external_badge.set_visible(external_connected)
         message = self.result_message(result)
         if result.returncode == 0:
             self.keyboard_enabled = "enabled" in message
@@ -218,11 +273,11 @@ class KeyboardWindow(Gtk.ApplicationWindow):
                 else "Built-in keyboard input is blocked."
             )
             self.status_icon.set_from_icon_name(
-                "input-keyboard-symbolic"
+                "computer-symbolic"
                 if self.keyboard_enabled
-                else "action-unavailable-symbolic"
+                else "input-keyboard-symbolic"
             )
-            self.status_badge.set_visible(self.keyboard_enabled)
+            self.status_badge.set_visible(True)
             self.sync_mode_controls()
             self.device_state.set_text("On" if self.keyboard_enabled else "Off")
             self.device_state.remove_css_class("off")
@@ -230,6 +285,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
                 self.device_state.add_css_class("off")
             self.laptop_mode_button.set_sensitive(True)
             self.desk_mode_button.set_sensitive(True)
+            self.keyboard_switch.set_sensitive(True)
             self.status_frame.remove_css_class("error")
         else:
             self.keyboard_enabled = None
@@ -242,17 +298,35 @@ class KeyboardWindow(Gtk.ApplicationWindow):
             self.device_state.set_text("Unavailable")
             self.laptop_mode_button.set_sensitive(False)
             self.desk_mode_button.set_sensitive(False)
+            self.keyboard_switch.set_sensitive(False)
             self.status_frame.add_css_class("error")
 
     def sync_mode_controls(self):
         self.updating_mode = True
         self.laptop_mode_button.set_active(bool(self.keyboard_enabled))
         self.desk_mode_button.set_active(self.keyboard_enabled is False)
+        self.keyboard_switch.set_active(bool(self.keyboard_enabled))
+        self.keyboard_switch.set_state(bool(self.keyboard_enabled))
         self.updating_mode = False
 
     def on_mode_selected(self, button, keyboard_enabled):
         if self.updating_mode or not button.get_active():
             return
+        if self.keyboard_enabled is None:
+            self.refresh_status()
+            return
+        if keyboard_enabled == self.keyboard_enabled:
+            return
+
+        self.request_keyboard_state(keyboard_enabled)
+
+    def on_keyboard_switch(self, _switch, keyboard_enabled):
+        if self.updating_mode:
+            return False
+        self.request_keyboard_state(keyboard_enabled)
+        return True
+
+    def request_keyboard_state(self, keyboard_enabled):
         if self.keyboard_enabled is None:
             self.refresh_status()
             return
@@ -401,6 +475,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
             self.sync_mode_controls()
             self.laptop_mode_button.set_sensitive(True)
             self.desk_mode_button.set_sensitive(True)
+            self.keyboard_switch.set_sensitive(True)
         return GLib.SOURCE_REMOVE
 
 
@@ -414,8 +489,8 @@ def load_css():
         .header-icon {
             color: @accent_color;
             background: alpha(@accent_color, 0.14);
-            border-radius: 11px;
-            padding: 9px;
+            border-radius: 13px;
+            padding: 11px;
         }
         .section-label {
             font-weight: 700;
@@ -424,8 +499,8 @@ def load_css():
         }
         .mode-selector { margin-bottom: 2px; }
         button.mode-button {
-            min-height: 86px;
-            padding: 12px;
+            min-height: 126px;
+            padding: 18px;
             border-radius: 14px;
             border: 1px solid @borders;
             background: @card_bg_color;
@@ -451,8 +526,6 @@ def load_css():
             background: alpha(@error_color, 0.08);
         }
         .status-row { padding: 20px; }
-        .control-row { padding: 14px 20px; }
-        .device-card separator { background: @borders; }
         .status-icon { color: @accent_color; }
         .status-badge {
             color: white;
@@ -462,28 +535,42 @@ def load_css():
             padding: 2px;
         }
         .device-card.error .status-icon { color: @error_color; }
-        .state-enabled { color: #2e9b55; }
-        .state-disabled { color: #d94b4b; }
+        .state-enabled, .state-disabled { color: @accent_color; }
+        .external-badge {
+            color: @accent_color;
+            background: alpha(@accent_color, 0.12);
+            border-radius: 12px;
+            padding: 8px 12px;
+        }
+        .controls-card {
+            border-radius: 16px;
+            border: 1px solid @borders;
+            background: @card_bg_color;
+            box-shadow: 0 3px 12px alpha(black, 0.08);
+        }
+        .controls-card separator {
+            background: @borders;
+            margin-left: 20px;
+            margin-right: 20px;
+        }
+        .device-row { padding: 14px 20px; }
+        .device-row > image { color: alpha(@window_fg_color, 0.78); }
+        .device-value {
+            min-width: 32px;
+            opacity: 0.82;
+        }
         .safety-note {
             color: alpha(@window_fg_color, 0.72);
-            padding: 2px 5px;
+            background: alpha(@window_fg_color, 0.05);
+            border: 1px solid @borders;
+            border-radius: 12px;
+            padding: 10px 14px;
         }
         .safety-note image {
             color: @warning_color;
             opacity: 0.85;
         }
         .warning-dialog-icon { color: @warning_color; }
-        .state-pill {
-            color: white;
-            background: #2e9b55;
-            border-radius: 999px;
-            padding: 4px 10px;
-            font-weight: 700;
-        }
-        .state-pill.off {
-            background: alpha(@window_fg_color, 0.16);
-            color: @window_fg_color;
-        }
         button { border-radius: 10px; }
         .dim-label { opacity: 0.68; }
     """)
