@@ -248,7 +248,8 @@ is why external-device detection must not be treated as perfect truth.
 Current behavior:
 
 - The GUI warns before Desk Mode when no external keyboard is detected.
-- The extension automatically disables when an external endpoint appears.
+- Automatic switching is an opt-in GSettings preference and defaults off.
+- When enabled, the extension disables when an external endpoint appears.
 - The extension restores the keyboard when the last endpoint disappears, but
   only if KeyFlip itself performed the automatic disable.
 
@@ -351,12 +352,14 @@ The extension currently uses two timers:
 - Every 500 milliseconds: refresh the set of external keyboards.
 
 Polling is simple and robust, but it performs repeated subprocess and udev
-work. A future version could listen to udev events through a dedicated service
-instead.
+work. The subprocess calls are asynchronous so they do not block GNOME Shell's
+main thread. A future version could listen to udev events through a dedicated
+service instead.
 
 ### Automatic switching state
 
-`_autoDisabled` records ownership of an automatic disable cycle.
+The persistent `automatic-disable-owned` GSettings key records ownership of an
+automatic disable cycle.
 
 Why ownership matters:
 
@@ -491,11 +494,10 @@ This layered approach is much faster than repeatedly changing UI code.
 3. External-keyboard detection depends on udev classifications and can have
    false positives.
 4. The GUI's presets currently control only the internal keyboard.
-5. The extension stores automatic-cycle ownership only in memory and infers it
-   after reload in one narrow case.
-6. Both front ends poll by spawning helper processes.
-7. Some extension OSD behavior relies on private GNOME Shell internals.
-8. There is no automated integration test for real sysfs mutation.
+5. Both front ends poll by spawning helper processes, although that work is
+   performed asynchronously.
+6. Some extension OSD behavior relies on private GNOME Shell internals.
+7. There is no automated integration test for real sysfs mutation.
 
 These are not merely missing features; they define the safe boundary of what
 the current code can promise.

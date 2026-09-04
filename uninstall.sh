@@ -41,6 +41,8 @@ if $remove_extension; then
     rm -rf /usr/share/gnome-shell/extensions/keyflip@miflow13.github.io
 fi
 if $remove_core; then
+    rm -f /usr/share/glib-2.0/schemas/io.github.miflow13.KeyFlip.gschema.xml
+    glib-compile-schemas /usr/share/glib-2.0/schemas
     rm -f /usr/share/polkit-1/actions/io.github.miflow13.KeyFlip.policy
     rm -f /usr/libexec/keyflip/keyflip-helper
     rm -rf /usr/share/keyflip

@@ -36,10 +36,14 @@ source_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # Shared core
 install -d /usr/libexec/keyflip /usr/share/keyflip/sounds
 install -d /usr/share/polkit-1/actions
+install -d /usr/share/glib-2.0/schemas
 install -m 755 "$source_dir/keyflip-helper" /usr/libexec/keyflip/keyflip-helper
 install -m 644 "$source_dir/assets/sounds/"*.ogg /usr/share/keyflip/sounds/
 install -m 644 "$source_dir/packaging/io.github.miflow13.KeyFlip.policy" \
     /usr/share/polkit-1/actions/io.github.miflow13.KeyFlip.policy
+install -m 644 "$source_dir/packaging/io.github.miflow13.KeyFlip.gschema.xml" \
+    /usr/share/glib-2.0/schemas/io.github.miflow13.KeyFlip.gschema.xml
+glib-compile-schemas /usr/share/glib-2.0/schemas
 
 if $install_gui; then
     install -d /usr/local/bin /usr/local/share/applications
@@ -68,7 +72,7 @@ if $install_extension; then
     install -m 644 "$source_dir/gnome-extension/"*.svg "$extension_dir/"
 fi
 
-echo "KeyFlip 0.1.0-beta installed."
+echo "KeyFlip 0.2.0-beta installed."
 if $install_extension; then
     echo "Log out and back in once, then run: gnome-extensions enable keyflip@miflow13.github.io"
 fi

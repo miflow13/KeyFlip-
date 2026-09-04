@@ -24,7 +24,7 @@ Useful when you're using an external keyboard and want to avoid accidental input
 ## Features
 
 - Toggle the internal laptop keyboard on or off
-- Automatically disable it when a USB or Bluetooth keyboard connects, then
+- Optionally disable it when a USB or Bluetooth keyboard connects, then
   re-enable it when the last external keyboard disconnects
 - Warn before manual disabling when no external keyboard is detected
 - Works on **Wayland** and **X11**
@@ -62,7 +62,7 @@ Currently built and tested for:
 
 Download and extract:
 
-`keyflip-0.1.0-beta.tar.gz`
+`keyflip-0.2.0-beta.tar.gz`
 
 Open a terminal inside the extracted folder. To install both interfaces, run:
 
@@ -104,6 +104,6 @@ I review, test, modify, and take responsibility for everything released in this 
 
 ## Status
 
-**Version:** `0.1.0-beta`
+**Version:** `0.2.0-beta`
 
 KeyFlip is still in active development. Bug reports and feedback are welcome.

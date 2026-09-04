@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="io.github.miflow13.KeyFlip" path="/io/github/miflow13/KeyFlip/">
+    <key name="automatic-mode-switching" type="b">
+      <default>false</default>
+      <summary>Automatically switch input modes</summary>
+      <description>Activate Desk Mode when an external keyboard connects and restore Laptop Mode when it disconnects.</description>
+    </key>
+    <key name="automatic-disable-owned" type="b">
+      <default>false</default>
+      <summary>Automatic disable ownership</summary>
+      <description>Records whether KeyFlip automatically disabled the internal keyboard so it can safely restore it later.</description>
+    </key>
+  </schema>
+</schemalist>

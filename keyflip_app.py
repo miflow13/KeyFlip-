@@ -7,7 +7,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
-from gi.repository import Gdk, GLib, Gtk, Pango
+from gi.repository import Gdk, Gio, GLib, Gtk, Pango
 
 
 APP_NAME = "KeyFlip"
@@ -17,12 +17,14 @@ INSTALLED_SOUND_DIR = Path("/usr/share/keyflip/sounds")
 SOURCE_SOUND_DIR = Path(__file__).resolve().parent / "assets" / "sounds"
 SOUND_DIR = INSTALLED_SOUND_DIR if INSTALLED_SOUND_DIR.is_dir() else SOURCE_SOUND_DIR
 PKEXEC = "/usr/bin/pkexec"
+SETTINGS_SCHEMA = "io.github.miflow13.KeyFlip"
 
 
 class KeyboardWindow(Gtk.ApplicationWindow):
     def __init__(self, application):
         super().__init__(application=application, title=APP_NAME)
         self.set_icon_name("io.github.miflow13.KeyFlip")
+        self.settings = Gio.Settings.new(SETTINGS_SCHEMA)
         self.set_default_size(680, 680)
         self.set_resizable(False)
 
@@ -153,27 +155,29 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         controls.append(keyboard_row)
         controls.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
-        touchpad_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
-        touchpad_row.add_css_class("device-row")
-        touchpad_icon = Gtk.Image.new_from_icon_name("input-touchpad-symbolic")
-        touchpad_icon.set_pixel_size(20)
-        touchpad_row.append(touchpad_icon)
-        touchpad_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        touchpad_text.set_hexpand(True)
-        touchpad_title = Gtk.Label(label="Touchpad", xalign=0)
-        touchpad_title.add_css_class("title-3")
-        touchpad_description = Gtk.Label(label="Planned for a future release", xalign=0)
-        touchpad_description.add_css_class("dim-label")
-        touchpad_text.append(touchpad_title)
-        touchpad_text.append(touchpad_description)
-        touchpad_row.append(touchpad_text)
-        self.touchpad_switch = Gtk.Switch(active=True, sensitive=False)
-        self.touchpad_switch.set_valign(Gtk.Align.CENTER)
-        touchpad_row.append(self.touchpad_switch)
-        touchpad_value = Gtk.Label(label="Soon")
-        touchpad_value.add_css_class("device-value")
-        touchpad_row.append(touchpad_value)
-        controls.append(touchpad_row)
+        automatic_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        automatic_row.add_css_class("device-row")
+        automatic_icon = Gtk.Image.new_from_icon_name("emblem-synchronizing-symbolic")
+        automatic_icon.set_pixel_size(20)
+        automatic_row.append(automatic_icon)
+        automatic_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        automatic_text.set_hexpand(True)
+        automatic_title = Gtk.Label(label="Automatic mode switching", xalign=0)
+        automatic_title.add_css_class("title-3")
+        automatic_description = Gtk.Label(
+            label="Let the GNOME extension switch modes for external keyboards", xalign=0
+        )
+        automatic_description.add_css_class("dim-label")
+        automatic_text.append(automatic_title)
+        automatic_text.append(automatic_description)
+        automatic_row.append(automatic_text)
+        self.automatic_switch = Gtk.Switch(
+            active=self.settings.get_boolean("automatic-mode-switching")
+        )
+        self.automatic_switch.set_valign(Gtk.Align.CENTER)
+        self.automatic_switch.connect("notify::active", self.on_automatic_switch_changed)
+        automatic_row.append(self.automatic_switch)
+        controls.append(automatic_row)
         controls_frame.set_child(controls)
         outer.append(controls_frame)
 
@@ -195,6 +199,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         self.keyboard_enabled = None
         self.updating_mode = False
         self.busy = False
+        self.refreshing = False
         self.safety_dialog = None
         self.refresh_status()
         self.status_timer = GLib.timeout_add_seconds(1, self.sync_status)
@@ -252,8 +257,18 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         return False
 
     def refresh_status(self):
+        if self.refreshing or self.busy:
+            return
+        self.refreshing = True
+        threading.Thread(target=self.finish_status_refresh, daemon=True).start()
+
+    def finish_status_refresh(self):
         result = self.run_command("status")
         external = self.run_command("external-list")
+        GLib.idle_add(self.apply_status_refresh, result, external)
+
+    def apply_status_refresh(self, result, external):
+        self.refreshing = False
         external_connected = external.returncode == 0 and bool(external.stdout.strip())
         self.external_badge.set_visible(external_connected)
         message = self.result_message(result)
@@ -300,6 +315,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
             self.desk_mode_button.set_sensitive(False)
             self.keyboard_switch.set_sensitive(False)
             self.status_frame.add_css_class("error")
+        return GLib.SOURCE_REMOVE
 
     def sync_mode_controls(self):
         self.updating_mode = True
@@ -326,12 +342,20 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         self.request_keyboard_state(keyboard_enabled)
         return True
 
+    def on_automatic_switch_changed(self, switch, _property):
+        enabled = switch.get_active()
+        self.settings.set_boolean("automatic-mode-switching", enabled)
+        if not enabled:
+            self.settings.set_boolean("automatic-disable-owned", False)
+
     def request_keyboard_state(self, keyboard_enabled):
         if self.keyboard_enabled is None:
             self.refresh_status()
             return
         if keyboard_enabled == self.keyboard_enabled:
             return
+
+        self.settings.set_boolean("automatic-disable-owned", False)
 
         # Keep the selected preset tied to confirmed device state.
         self.sync_mode_controls()
