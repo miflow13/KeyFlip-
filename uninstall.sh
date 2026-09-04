@@ -10,5 +10,7 @@ rm -f /usr/local/bin/keyflip
 rm -f /usr/local/share/applications/io.github.miflow13.KeyFlip.desktop
 rm -f /usr/local/share/icons/hicolor/512x512/apps/io.github.miflow13.KeyFlip.png
 rm -f /usr/local/share/metainfo/io.github.miflow13.KeyFlip.metainfo.xml
+rm -f /usr/share/polkit-1/actions/io.github.miflow13.KeyFlip.policy
+rm -rf /usr/share/gnome-shell/extensions/keyflip@miflow13.github.io
 rm -rf /usr/local/lib/keyflip
 echo "KeyFlip removed."

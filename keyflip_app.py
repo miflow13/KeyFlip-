@@ -13,26 +13,26 @@ from gi.repository import Gdk, GLib, Gtk, Pango
 APP_NAME = "KeyFlip"
 VERSION = "0.1.0-beta"
 SCRIPT = Path(__file__).resolve().with_name("keyflip-helper")
+SOUND_DIR = Path(__file__).resolve().parent / "assets" / "sounds"
 PKEXEC = "/usr/bin/pkexec"
-BASH = "/usr/bin/bash"
 
 
 class KeyboardWindow(Gtk.ApplicationWindow):
     def __init__(self, application):
         super().__init__(application=application, title=APP_NAME)
         self.set_icon_name("io.github.miflow13.KeyFlip")
-        self.set_default_size(500, 430)
+        self.set_default_size(640, 390)
         self.set_resizable(False)
 
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=22)
-        outer.set_margin_top(32)
-        outer.set_margin_bottom(32)
-        outer.set_margin_start(32)
-        outer.set_margin_end(32)
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        outer.set_margin_top(20)
+        outer.set_margin_bottom(20)
+        outer.set_margin_start(24)
+        outer.set_margin_end(24)
 
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
         header_icon = Gtk.Image.new_from_icon_name("input-keyboard-symbolic")
-        header_icon.set_pixel_size(34)
+        header_icon.set_pixel_size(28)
         header_icon.add_css_class("header-icon")
         header.append(header_icon)
         header_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
@@ -48,14 +48,24 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         self.status_frame = Gtk.Frame()
         self.status_frame.add_css_class("status-card")
         status_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-        status_row.set_margin_top(20)
-        status_row.set_margin_bottom(20)
-        status_row.set_margin_start(20)
-        status_row.set_margin_end(20)
+        status_row.set_margin_top(13)
+        status_row.set_margin_bottom(13)
+        status_row.set_margin_start(18)
+        status_row.set_margin_end(18)
         self.status_icon = Gtk.Image.new_from_icon_name("content-loading-symbolic")
-        self.status_icon.set_pixel_size(32)
+        self.status_icon.set_pixel_size(38)
         self.status_icon.add_css_class("status-icon")
-        status_row.append(self.status_icon)
+        self.status_icon_stack = Gtk.Overlay()
+        self.status_icon_stack.set_size_request(46, 42)
+        self.status_icon_stack.set_child(self.status_icon)
+        self.status_badge = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+        self.status_badge.set_pixel_size(15)
+        self.status_badge.set_halign(Gtk.Align.END)
+        self.status_badge.set_valign(Gtk.Align.END)
+        self.status_badge.add_css_class("status-badge")
+        self.status_badge.set_visible(False)
+        self.status_icon_stack.add_overlay(self.status_badge)
+        status_row.append(self.status_icon_stack)
         status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
         status_box.set_hexpand(True)
         self.state_label = Gtk.Label(label="Checking status...", xalign=0)
@@ -83,7 +93,6 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         safety_label.set_wrap(True)
         safety_label.set_hexpand(True)
         safety_box.append(safety_label)
-        outer.append(safety_box)
 
         switch_card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18)
         switch_card.add_css_class("switch-card")
@@ -98,12 +107,13 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         switch_card.append(switch_text)
         self.toggle_switch = Gtk.Switch()
         self.toggle_switch.set_valign(Gtk.Align.CENTER)
-        self.toggle_switch.set_size_request(96, 52)
+        self.toggle_switch.set_size_request(146, 74)
         self.toggle_switch.add_css_class("large-switch")
         self.toggle_switch.set_tooltip_text("Enable or disable the internal keyboard")
         self.toggle_switch.connect("state-set", self.toggle_keyboard)
         switch_card.append(self.toggle_switch)
         outer.append(switch_card)
+        outer.append(safety_box)
 
         self.refresh_button = Gtk.Button(label="Refresh status")
         self.refresh_button.add_css_class("flat")
@@ -117,7 +127,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
 
     @staticmethod
     def run_command(*arguments, privileged=False):
-        command = [BASH, str(SCRIPT), *arguments]
+        command = [str(SCRIPT), *arguments]
         if privileged:
             command.insert(0, PKEXEC)
         try:
@@ -152,8 +162,11 @@ class KeyboardWindow(Gtk.ApplicationWindow):
                 else "Input from the laptop keyboard is blocked."
             )
             self.status_icon.set_from_icon_name(
-                "emblem-ok-symbolic" if self.keyboard_enabled else "action-unavailable-symbolic"
+                "input-keyboard-symbolic"
+                if self.keyboard_enabled
+                else "action-unavailable-symbolic"
             )
+            self.status_badge.set_visible(self.keyboard_enabled)
             self.updating_switch = True
             self.toggle_switch.set_active(self.keyboard_enabled)
             self.toggle_switch.set_state(self.keyboard_enabled)
@@ -168,6 +181,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
             self.state_label.remove_css_class("state-disabled")
             self.detail_label.set_text(message or "The keyboard status could not be read.")
             self.status_icon.set_from_icon_name("dialog-error-symbolic")
+            self.status_badge.set_visible(False)
             self.switch_hint.set_text("Status unavailable")
             self.toggle_switch.set_sensitive(False)
             self.status_frame.add_css_class("error")
@@ -181,6 +195,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         action = "enable" if requested_state else "disable"
         if requested_state == self.keyboard_enabled:
             return False
+        self.play_toggle_sound()
         self.set_busy(True)
         threading.Thread(target=self.finish_toggle, args=(action,), daemon=True).start()
         # Keep the thumb in its confirmed position until the privileged action succeeds.
@@ -205,31 +220,36 @@ class KeyboardWindow(Gtk.ApplicationWindow):
             if status.returncode != 0 or expected not in actual:
                 result = subprocess.CompletedProcess(result.args, 1, result.stdout, result.stderr)
                 message = f"The command completed, but the keyboard is still not {expected}. {actual}"
-        GLib.idle_add(self.show_toggle_result, result.returncode, message, action)
+        GLib.idle_add(self.show_toggle_result, result.returncode, message)
 
     @staticmethod
-    def play_sound(enabled):
-        sound = "device-added" if enabled else "device-removed"
+    def play_toggle_sound():
+        sound_file = SOUND_DIR / "toggle-on.ogg"
         try:
             subprocess.Popen(
-                ["/usr/bin/canberra-gtk-play", "-i", sound],
+                [
+                    "/usr/bin/canberra-gtk-play",
+                    f"--file={sound_file}",
+                    "--description=KeyFlip toggle",
+                    "--cache-control=permanent",
+                ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
         except OSError:
             pass
 
-    def show_toggle_result(self, returncode, message, action):
+    def show_toggle_result(self, returncode, message):
         self.set_busy(False)
         if returncode == 0:
             self.refresh_status()
-            self.play_sound(action == "enable")
         else:
             self.state_label.set_text("Keyboard change failed")
             self.state_label.remove_css_class("state-enabled")
             self.state_label.remove_css_class("state-disabled")
             self.detail_label.set_text(message)
             self.status_icon.set_from_icon_name("dialog-error-symbolic")
+            self.status_badge.set_visible(False)
             self.status_frame.add_css_class("error")
             self.switch_hint.set_text("Change failed — try again")
             self.toggle_switch.set_sensitive(True)
@@ -247,7 +267,7 @@ def load_css():
             color: @accent_color;
             background: alpha(@accent_color, 0.12);
             border-radius: 12px;
-            padding: 10px;
+            padding: 8px;
         }
         .status-card {
             border-radius: 14px;
@@ -260,6 +280,13 @@ def load_css():
             background: alpha(@error_color, 0.08);
         }
         .status-icon { color: @accent_color; }
+        .status-badge {
+            color: white;
+            background: #2e9b55;
+            border: 2px solid @card_bg_color;
+            border-radius: 12px;
+            padding: 2px;
+        }
         .status-card.error .status-icon { color: @error_color; }
         .state-enabled { color: #2e9b55; }
         .state-disabled { color: #d94b4b; }
@@ -267,25 +294,25 @@ def load_css():
             color: @window_fg_color;
             background: alpha(@warning_color, 0.12);
             border-radius: 10px;
-            padding: 12px;
+            padding: 9px 12px;
         }
         .safety-note image { color: @warning_color; }
         .switch-card {
             background: @card_bg_color;
             border: 1px solid @borders;
             border-radius: 14px;
-            padding: 16px 18px;
+            padding: 10px 18px;
         }
         switch.large-switch {
-            min-width: 82px;
-            min-height: 42px;
-            border-radius: 24px;
+            min-width: 132px;
+            min-height: 64px;
+            border-radius: 36px;
         }
         switch.large-switch slider {
-            min-width: 36px;
-            min-height: 36px;
-            border-radius: 20px;
-            margin: 3px;
+            min-width: 56px;
+            min-height: 56px;
+            border-radius: 30px;
+            margin: 4px;
         }
         button { border-radius: 8px; }
         .dim-label { opacity: 0.68; }

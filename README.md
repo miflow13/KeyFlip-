@@ -105,3 +105,65 @@ Then open a terminal inside the folder and run:
 ```bash
 cd keyflip-0.1.0-beta
 sudo ./install.sh
+```
+
+Open **KeyFlip** from the GNOME application menu. Running directly from source uses the normal Fedora administrator authorization prompt; the installed application uses the restricted KeyFlip policy described below.
+
+After installation, log out and back in once, then enable the top-bar control:
+
+```bash
+gnome-extensions enable keyflip@miflow13.github.io
+```
+
+Click the keyboard icon in the GNOME top bar to enable or disable the internal keyboard instantly. The installed Polkit policy permits an active local session to run only KeyFlip's root-owned keyboard helper without another password prompt; it does not grant general passwordless administrator access. The full KeyFlip window remains available from the application menu.
+
+Keep an external keyboard connected before disabling the internal keyboard.
+
+## Run from source
+
+```bash
+./keyflip
+```
+
+## Command-line helper
+
+From the source directory:
+
+```bash
+sudo ./keyflip-helper disable
+sudo ./keyflip-helper enable
+sudo ./keyflip-helper toggle
+./keyflip-helper status
+```
+
+For a safe 15-second test:
+
+```bash
+sudo ./keyflip-helper test
+```
+
+## Build a release archive
+
+```bash
+make package
+```
+
+The distributable archive and SHA-256 checksum are written to `dist/`.
+
+## Uninstall
+
+From the extracted release or source directory:
+
+```bash
+sudo ./uninstall.sh
+```
+
+## Recovery
+
+If authorization is cancelled while the internal keyboard is disabled, use an external keyboard and run:
+
+```bash
+sudo /usr/local/lib/keyflip/keyflip-helper enable
+```
+
+Restarting the computer also restores normal keyboard operation.

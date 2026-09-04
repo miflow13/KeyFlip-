@@ -6,7 +6,7 @@ project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 bundle="$stage/keyflip-$version"
-mkdir -p "$bundle/assets" "$bundle/packaging"
+mkdir -p "$bundle/assets/sounds" "$bundle/packaging" "$bundle/gnome-extension"
 
 install -m 644 "$project_dir/app.py" "$bundle/app.py"
 install -m 644 "$project_dir/keyflip_app.py" "$bundle/keyflip_app.py"
@@ -16,8 +16,14 @@ install -m 755 "$project_dir/install.sh" "$bundle/install.sh"
 install -m 755 "$project_dir/uninstall.sh" "$bundle/uninstall.sh"
 install -m 644 "$project_dir/README.md" "$bundle/README.md"
 install -m 644 "$project_dir/assets/keyflip.png" "$bundle/assets/keyflip.png"
+install -m 644 "$project_dir/assets/sounds/"*.ogg "$bundle/assets/sounds/"
 install -m 644 "$project_dir/packaging/io.github.miflow13.KeyFlip.desktop" "$bundle/packaging/"
 install -m 644 "$project_dir/packaging/io.github.miflow13.KeyFlip.metainfo.xml" "$bundle/packaging/"
+install -m 644 "$project_dir/packaging/io.github.miflow13.KeyFlip.policy" "$bundle/packaging/"
+install -m 644 "$project_dir/gnome-extension/extension.js" "$bundle/gnome-extension/"
+install -m 644 "$project_dir/gnome-extension/metadata.json" "$bundle/gnome-extension/"
+install -m 644 "$project_dir/gnome-extension/stylesheet.css" "$bundle/gnome-extension/"
+install -m 644 "$project_dir/gnome-extension/"*.svg "$bundle/gnome-extension/"
 
 mkdir -p "$project_dir/dist"
 tar -C "$stage" -czf "$project_dir/dist/keyflip-$version.tar.gz" "keyflip-$version"
