@@ -1,5 +1,7 @@
 # KeyFlip Internals and Learning Guide
 
+## STRICTLY FOR ME SO THAT I CAN LEARN WHAT WAS VIBE CODED. THANK YOU
+
 This document explains what KeyFlip does, how its pieces cooperate, why the
 architecture looks the way it does, and where its current limitations are. It
 is written for maintainers who want to understand the system rather than treat
