@@ -27,6 +27,21 @@ class KeyFlipIndicator extends St.Button {
         this.set_child(this._keyboardIcon);
         this.connect('clicked', () => this._toggle());
         this._refresh();
+        this._statusTimer = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            1,
+            () => {
+                if (!this._busy)
+                    this._refresh();
+                return GLib.SOURCE_CONTINUE;
+            }
+        );
+        this.connect('destroy', () => {
+            if (this._statusTimer) {
+                GLib.source_remove(this._statusTimer);
+                this._statusTimer = null;
+            }
+        });
     }
 
     _run(argv) {
@@ -65,7 +80,7 @@ class KeyFlipIndicator extends St.Button {
 
         this._busy = true;
         const enabling = !this._enabled;
-        this._playSound();
+        this._playSound(enabling);
         this._keyboardIcon.opacity = 130;
 
         GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
@@ -87,8 +102,8 @@ class KeyFlipIndicator extends St.Button {
         });
     }
 
-    _playSound() {
-        const sound = `${SOUND_DIR}/toggle-on.ogg`;
+    _playSound(enabling) {
+        const sound = `${SOUND_DIR}/toggle-${enabling ? 'on' : 'off'}.ogg`;
         try {
             Gio.Subprocess.new(
                 ['/usr/bin/canberra-gtk-play', `--file=${sound}`],

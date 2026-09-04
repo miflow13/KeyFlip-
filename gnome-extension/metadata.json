@@ -4,5 +4,5 @@
   "description": "Toggle the internal laptop keyboard from the GNOME top bar.",
   "shell-version": ["50"],
   "url": "https://github.com/miflow13/KeyFlip-",
-  "version": 5
+  "version": 7
 }

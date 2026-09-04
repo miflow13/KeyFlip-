@@ -123,7 +123,10 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         self.set_child(outer)
         self.keyboard_enabled = None
         self.updating_switch = False
+        self.busy = False
         self.refresh_status()
+        self.status_timer = GLib.timeout_add_seconds(1, self.sync_status)
+        self.connect("close-request", self.stop_status_sync)
 
     @staticmethod
     def run_command(*arguments, privileged=False):
@@ -140,10 +143,22 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         return (result.stdout or result.stderr).strip()
 
     def set_busy(self, busy):
+        self.busy = busy
         self.toggle_switch.set_sensitive(not busy)
         self.refresh_button.set_sensitive(not busy)
         if busy:
             self.switch_hint.set_text("Waiting for authorization…")
+
+    def sync_status(self):
+        if not self.busy:
+            self.refresh_status()
+        return GLib.SOURCE_CONTINUE
+
+    def stop_status_sync(self, _window):
+        if self.status_timer:
+            GLib.source_remove(self.status_timer)
+            self.status_timer = None
+        return False
 
     def refresh_status(self):
         result = self.run_command("status")
