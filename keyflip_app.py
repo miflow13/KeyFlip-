@@ -11,7 +11,7 @@ from gi.repository import Gdk, GLib, Gtk, Pango
 
 
 APP_NAME = "KeyFlip"
-VERSION = "0.1.0-beta"
+VERSION = "0.2.0-beta"
 SCRIPT = Path(__file__).resolve().with_name("keyflip-helper")
 INSTALLED_SOUND_DIR = Path("/usr/share/keyflip/sounds")
 SOURCE_SOUND_DIR = Path(__file__).resolve().parent / "assets" / "sounds"
@@ -23,7 +23,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
     def __init__(self, application):
         super().__init__(application=application, title=APP_NAME)
         self.set_icon_name("io.github.miflow13.KeyFlip")
-        self.set_default_size(520, 360)
+        self.set_default_size(520, 430)
         self.set_resizable(False)
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -40,7 +40,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         header_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         heading = Gtk.Label(label=APP_NAME, xalign=0)
         heading.add_css_class("title-1")
-        subtitle = Gtk.Label(label=f"Internal keyboard control · {VERSION}", xalign=0)
+        subtitle = Gtk.Label(label=f"Laptop input profiles · {VERSION}", xalign=0)
         subtitle.add_css_class("dim-label")
         header_text.append(heading)
         header_text.append(subtitle)
@@ -54,6 +54,30 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         self.refresh_button.connect("clicked", lambda _: self.refresh_status())
         header.append(self.refresh_button)
         outer.append(header)
+
+        setup_label = Gtk.Label(label="Current setup", xalign=0)
+        setup_label.add_css_class("section-label")
+        outer.append(setup_label)
+
+        mode_selector = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        mode_selector.add_css_class("mode-selector")
+        mode_selector.set_homogeneous(True)
+        self.laptop_mode_button = self.create_mode_button(
+            "computer-symbolic", "Laptop Mode", "Built-in input enabled"
+        )
+        self.desk_mode_button = self.create_mode_button(
+            "input-keyboard-symbolic", "Desk Mode", "Built-in keyboard off"
+        )
+        self.desk_mode_button.set_group(self.laptop_mode_button)
+        self.laptop_mode_button.connect(
+            "toggled", self.on_mode_selected, True
+        )
+        self.desk_mode_button.connect(
+            "toggled", self.on_mode_selected, False
+        )
+        mode_selector.append(self.laptop_mode_button)
+        mode_selector.append(self.desk_mode_button)
+        outer.append(mode_selector)
 
         self.status_frame = Gtk.Frame()
         self.status_frame.add_css_class("device-card")
@@ -89,24 +113,16 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         card_content.append(status_row)
         card_content.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
-        switch_card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18)
-        switch_card.add_css_class("control-row")
-        switch_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
-        switch_text.set_hexpand(True)
-        switch_title = Gtk.Label(label="Internal keyboard", xalign=0)
-        switch_title.add_css_class("title-3")
-        self.switch_hint = Gtk.Label(label="Checking keyboard state…", xalign=0)
-        self.switch_hint.add_css_class("dim-label")
-        switch_text.append(switch_title)
-        switch_text.append(self.switch_hint)
-        switch_card.append(switch_text)
-        self.toggle_switch = Gtk.Switch()
-        self.toggle_switch.set_valign(Gtk.Align.CENTER)
-        self.toggle_switch.add_css_class("compact-switch")
-        self.toggle_switch.set_tooltip_text("Enable or disable the internal keyboard")
-        self.toggle_switch.connect("state-set", self.toggle_keyboard)
-        switch_card.append(self.toggle_switch)
-        card_content.append(switch_card)
+        device_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18)
+        device_row.add_css_class("control-row")
+        device_name = Gtk.Label(label="Internal keyboard", xalign=0)
+        device_name.set_hexpand(True)
+        device_name.add_css_class("title-3")
+        self.device_state = Gtk.Label(label="Checking…")
+        self.device_state.add_css_class("state-pill")
+        device_row.append(device_name)
+        device_row.append(self.device_state)
+        card_content.append(device_row)
         self.status_frame.set_child(card_content)
         outer.append(self.status_frame)
 
@@ -126,12 +142,29 @@ class KeyboardWindow(Gtk.ApplicationWindow):
 
         self.set_child(outer)
         self.keyboard_enabled = None
-        self.updating_switch = False
+        self.updating_mode = False
         self.busy = False
         self.safety_dialog = None
         self.refresh_status()
         self.status_timer = GLib.timeout_add_seconds(1, self.sync_status)
         self.connect("close-request", self.stop_status_sync)
+
+    @staticmethod
+    def create_mode_button(icon_name, title, description):
+        button = Gtk.ToggleButton()
+        button.add_css_class("mode-button")
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        icon = Gtk.Image.new_from_icon_name(icon_name)
+        icon.set_pixel_size(24)
+        title_label = Gtk.Label(label=title)
+        title_label.add_css_class("title-3")
+        description_label = Gtk.Label(label=description)
+        description_label.add_css_class("dim-label")
+        content.append(icon)
+        content.append(title_label)
+        content.append(description_label)
+        button.set_child(content)
+        return button
 
     @staticmethod
     def run_command(*arguments, privileged=False):
@@ -149,10 +182,11 @@ class KeyboardWindow(Gtk.ApplicationWindow):
 
     def set_busy(self, busy):
         self.busy = busy
-        self.toggle_switch.set_sensitive(not busy)
+        self.laptop_mode_button.set_sensitive(not busy)
+        self.desk_mode_button.set_sensitive(not busy)
         self.refresh_button.set_sensitive(not busy)
         if busy:
-            self.switch_hint.set_text("Waiting for authorization…")
+            self.device_state.set_text("Applying…")
 
     def sync_status(self):
         if not self.busy:
@@ -170,16 +204,18 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         message = self.result_message(result)
         if result.returncode == 0:
             self.keyboard_enabled = "enabled" in message
-            self.state_label.set_text("Keyboard enabled" if self.keyboard_enabled else "Keyboard disabled")
+            self.state_label.set_text(
+                "Laptop Mode active" if self.keyboard_enabled else "Desk Mode active"
+            )
             self.state_label.remove_css_class("state-enabled")
             self.state_label.remove_css_class("state-disabled")
             self.state_label.add_css_class(
                 "state-enabled" if self.keyboard_enabled else "state-disabled"
             )
             self.detail_label.set_text(
-                "Ready to type on this device."
+                "Built-in keyboard ready for portable use."
                 if self.keyboard_enabled
-                else "Input from the laptop keyboard is blocked."
+                else "Built-in keyboard input is blocked."
             )
             self.status_icon.set_from_icon_name(
                 "input-keyboard-symbolic"
@@ -187,12 +223,13 @@ class KeyboardWindow(Gtk.ApplicationWindow):
                 else "action-unavailable-symbolic"
             )
             self.status_badge.set_visible(self.keyboard_enabled)
-            self.updating_switch = True
-            self.toggle_switch.set_active(self.keyboard_enabled)
-            self.toggle_switch.set_state(self.keyboard_enabled)
-            self.updating_switch = False
-            self.switch_hint.set_text("On" if self.keyboard_enabled else "Off")
-            self.toggle_switch.set_sensitive(True)
+            self.sync_mode_controls()
+            self.device_state.set_text("On" if self.keyboard_enabled else "Off")
+            self.device_state.remove_css_class("off")
+            if not self.keyboard_enabled:
+                self.device_state.add_css_class("off")
+            self.laptop_mode_button.set_sensitive(True)
+            self.desk_mode_button.set_sensitive(True)
             self.status_frame.remove_css_class("error")
         else:
             self.keyboard_enabled = None
@@ -202,35 +239,40 @@ class KeyboardWindow(Gtk.ApplicationWindow):
             self.detail_label.set_text(message or "The keyboard status could not be read.")
             self.status_icon.set_from_icon_name("dialog-error-symbolic")
             self.status_badge.set_visible(False)
-            self.switch_hint.set_text("Status unavailable")
-            self.toggle_switch.set_sensitive(False)
+            self.device_state.set_text("Unavailable")
+            self.laptop_mode_button.set_sensitive(False)
+            self.desk_mode_button.set_sensitive(False)
             self.status_frame.add_css_class("error")
 
-    def toggle_keyboard(self, _switch, requested_state):
-        if self.updating_switch:
-            return False
+    def sync_mode_controls(self):
+        self.updating_mode = True
+        self.laptop_mode_button.set_active(bool(self.keyboard_enabled))
+        self.desk_mode_button.set_active(self.keyboard_enabled is False)
+        self.updating_mode = False
+
+    def on_mode_selected(self, button, keyboard_enabled):
+        if self.updating_mode or not button.get_active():
+            return
         if self.keyboard_enabled is None:
             self.refresh_status()
-            return True
-        action = "enable" if requested_state else "disable"
-        if requested_state == self.keyboard_enabled:
-            return False
+            return
+        if keyboard_enabled == self.keyboard_enabled:
+            return
+
+        # Keep the selected preset tied to confirmed device state.
+        self.sync_mode_controls()
+        action = "enable" if keyboard_enabled else "disable"
 
         if action == "disable":
             external = self.run_command("external-list")
             external_connected = external.returncode == 0 and bool(external.stdout.strip())
-            # Always confirm a manual disable. Device receivers can expose
-            # keyboard endpoints even when no usable keyboard is connected.
-            # Present after state-set finishes because synchronous modal
-            # presentation from this signal is unreliable in GTK 4.
-            GLib.idle_add(self.show_disable_warning, external_connected)
-            return True
+            if not external_connected:
+                GLib.idle_add(self.show_disable_warning)
+                return
 
-        self.start_toggle(action, requested_state)
-        # Keep the thumb in its confirmed position until the privileged action succeeds.
-        return True
+        self.start_toggle(action, keyboard_enabled)
 
-    def show_disable_warning(self, external_connected):
+    def show_disable_warning(self):
         if self.safety_dialog is not None:
             self.safety_dialog.present()
             return GLib.SOURCE_REMOVE
@@ -254,23 +296,14 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         warning_icon.add_css_class("warning-dialog-icon")
         content.append(warning_icon)
 
-        title = Gtk.Label(
-            label=(
-                "Disable internal keyboard?"
-                if external_connected
-                else "No external keyboard detected"
-            )
-        )
+        title = Gtk.Label(label="No external keyboard detected")
         title.add_css_class("title-2")
         content.append(title)
 
         message = Gtk.Label(
             label=(
-                "Make sure your external keyboard is ready. You will need it "
-                "to turn the internal keyboard back on."
-                if external_connected
-                else "Connect an external keyboard before disabling the internal "
-                "keyboard, or you may be unable to type."
+                "Desk Mode will disable your laptop keyboard. Connect an external "
+                "keyboard first, or you may be unable to type."
             )
         )
         message.set_wrap(True)
@@ -282,7 +315,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         actions.set_halign(Gtk.Align.END)
         cancel = Gtk.Button(label="Cancel")
         cancel.connect("clicked", lambda _button: self.close_safety_dialog())
-        confirm = Gtk.Button(label="Disable Anyway")
+        confirm = Gtk.Button(label="Activate Anyway")
         confirm.add_css_class("destructive-action")
         confirm.connect("clicked", lambda _button: self.confirm_unsafe_disable())
         actions.append(cancel)
@@ -364,8 +397,10 @@ class KeyboardWindow(Gtk.ApplicationWindow):
             self.status_icon.set_from_icon_name("dialog-error-symbolic")
             self.status_badge.set_visible(False)
             self.status_frame.add_css_class("error")
-            self.switch_hint.set_text("Change failed — try again")
-            self.toggle_switch.set_sensitive(True)
+            self.device_state.set_text("Change failed")
+            self.sync_mode_controls()
+            self.laptop_mode_button.set_sensitive(True)
+            self.desk_mode_button.set_sensitive(True)
         return GLib.SOURCE_REMOVE
 
 
@@ -381,6 +416,29 @@ def load_css():
             background: alpha(@accent_color, 0.14);
             border-radius: 11px;
             padding: 9px;
+        }
+        .section-label {
+            font-weight: 700;
+            opacity: 0.72;
+            margin-top: 2px;
+        }
+        .mode-selector { margin-bottom: 2px; }
+        button.mode-button {
+            min-height: 86px;
+            padding: 12px;
+            border-radius: 14px;
+            border: 1px solid @borders;
+            background: @card_bg_color;
+            box-shadow: none;
+        }
+        button.mode-button:hover {
+            background: alpha(@accent_color, 0.08);
+        }
+        button.mode-button:checked {
+            color: @accent_color;
+            border-color: alpha(@accent_color, 0.75);
+            background: alpha(@accent_color, 0.14);
+            box-shadow: inset 0 0 0 1px alpha(@accent_color, 0.22);
         }
         .device-card {
             border-radius: 16px;
@@ -415,16 +473,16 @@ def load_css():
             opacity: 0.85;
         }
         .warning-dialog-icon { color: @warning_color; }
-        switch.compact-switch {
-            min-width: 50px;
-            min-height: 28px;
-            border-radius: 16px;
+        .state-pill {
+            color: white;
+            background: #2e9b55;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-weight: 700;
         }
-        switch.compact-switch slider {
-            min-width: 22px;
-            min-height: 22px;
-            border-radius: 12px;
-            margin: 3px;
+        .state-pill.off {
+            background: alpha(@window_fg_color, 0.16);
+            color: @window_fg_color;
         }
         button { border-radius: 10px; }
         .dim-label { opacity: 0.68; }

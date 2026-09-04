@@ -2,11 +2,11 @@
 <component type="desktop-application">
   <id>io.github.miflow13.KeyFlip</id>
   <name>KeyFlip</name>
-  <summary>Toggle your laptop's internal keyboard</summary>
+  <summary>Switch your laptop between portable and desk setups</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>LicenseRef-proprietary</project_license>
   <description>
-    <p>KeyFlip provides a simple graphical control for enabling and disabling a supported i8042 laptop keyboard on Fedora GNOME.</p>
+    <p>KeyFlip provides simple Laptop Mode and Desk Mode presets for controlling a supported i8042 laptop keyboard on Fedora GNOME.</p>
   </description>
   <url type="homepage">https://github.com/miflow13/KeyFlip-</url>
   <launchable type="desktop-id">io.github.miflow13.KeyFlip.desktop</launchable>
@@ -15,6 +15,9 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.0-beta" date="2026-09-04">
+      <description><p>Adds Laptop Mode and Desk Mode presets with external-keyboard safety checks.</p></description>
+    </release>
     <release version="0.1.0-beta" date="2026-09-04">
       <description><p>Initial beta release.</p></description>
     </release>
