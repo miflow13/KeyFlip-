@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+app_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+if [[ -f "$app_dir/app.py" ]]; then
+    exec python3 "$app_dir/app.py" "$@"
+fi
+exec python3 /usr/local/lib/keyflip/app.py "$@"

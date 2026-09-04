@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Fedora GNOME: toggle a standard i8042/AT internal keyboard.
+# KeyFlip: toggle a standard i8042/AT internal keyboard on Fedora GNOME.
 # No persistent configuration changes. A reboot restores normal operation.
 set -euo pipefail
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
 
 usage() {
-    echo 'Usage: sudo internal-keyboard {toggle|enable|disable|test|status}'
+    echo 'Usage: sudo keyflip-helper {toggle|enable|disable|test|status}'
     echo 'test disables for about 15 seconds, then automatically enables.'
 }
 action=${1:-toggle}
@@ -52,6 +52,10 @@ fi
     echo 'Keyboard driver controls are unavailable. Nothing changed.' >&2
     exit 1
 }
+[[ -w "$port/bind_mode" ]] || {
+    echo 'Keyboard port binding control is unavailable. Nothing changed.' >&2
+    exit 1
+}
 # Serialize changes, including the automatic restore.
 exec 9>/run/internal-keyboard-toggle.lock
 flock -x 9
@@ -64,14 +68,19 @@ if [[ $action == test ]]; then
     [[ $state == enabled ]] || { echo 'Enable the keyboard before testing.'; exit 1; }
     # Schedule recovery before disabling. The job survives a closed terminal.
     systemd-run --quiet --collect --on-active=15s --timer-property=AccuracySec=1s \
-        /bin/bash -c 'exec 9>/run/internal-keyboard-toggle.lock; flock -x 9; if [[ ! -L /sys/bus/serio/devices/$1/driver ]]; then printf "%s" "$1" > /sys/bus/serio/drivers/atkbd/bind; fi' \
+        /bin/bash -c 'exec 9>/run/internal-keyboard-toggle.lock; flock -x 9; port=/sys/bus/serio/devices/$1; printf auto > "$port/bind_mode"; if [[ ! -L $port/driver ]]; then printf "%s" "$1" > /sys/bus/serio/drivers/atkbd/bind; fi' \
         keyboard-restore "$id"
+    printf manual > "$port/bind_mode"
     printf '%s' "$id" > "$driver/unbind"
     echo 'Internal keyboard disabled. Automatic restore in about 15 seconds.'
 elif [[ $action == disable ]]; then
+    printf manual > "$port/bind_mode"
     [[ $state == disabled ]] || printf '%s' "$id" > "$driver/unbind"
     echo 'Internal keyboard disabled. Use an external keyboard to enable it, or reboot.'
 else
-    [[ $state == enabled ]] || printf '%s' "$id" > "$driver/bind"
+    printf auto > "$port/bind_mode"
+    # Changing back to auto normally binds atkbd synchronously. Explicitly bind
+    # only when the kernel has not done so, since bind fails in manual mode.
+    [[ -L "$port/driver" ]] || printf '%s' "$id" > "$driver/bind"
     echo 'Internal keyboard enabled.'
 fi

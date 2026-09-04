@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=KeyFlip
+Comment=Toggle your laptop's internal keyboard
+Exec=/usr/local/bin/keyflip
+Icon=io.github.miflow13.KeyFlip
+Terminal=false
+Categories=Utility;
+Keywords=keyboard;toggle;laptop;internal;
+StartupNotify=true
+StartupWMClass=io.github.miflow13.KeyFlip
