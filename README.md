@@ -19,8 +19,9 @@ Useful when you're using an external keyboard and want to avoid accidental input
 - Simple GNOME interface
 
   ## Screenshots
-<img width="1536" height="1023" alt="Screenshot From 2026-09-04 15-56-56" src="https://github.com/user-attachments/assets/ed68bfef-b275-4c72-8a8b-a98021579358" />
-<img width="1539" height="1023" alt="Screenshot From 2026-09-04 15-57-06" src="https://github.com/user-attachments/assets/f95e26bc-903c-453a-9ee1-946c66c41eaf" />
+<img width="1920" height="1080" alt="Screenshot From 2026-09-04 19-30-01" src="https://github.com/user-attachments/assets/f43d125f-4547-4a41-83c9-76d11ffc778d" />
+<img width="1920" height="1080" alt="Screenshot From 2026-09-04 19-29-57" src="https://github.com/user-attachments/assets/f9233967-490a-4506-992e-ba2315ce6e88" />
+
 
 
 ## Requirements
