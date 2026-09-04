@@ -4,15 +4,15 @@
 
 # ✨ KeyFlip
 
-> **A tiny Fedora utility for when your laptop keyboard needs to mind her business.**
+> **A tiny Fedora utility ***
 
-**KeyFlip 0.1.0-beta** is a simple little Fedora GNOME app for safely enabling or disabling a supported laptop’s internal keyboard.
+**KeyFlip 0.1.0-beta** is a simple GNOME app for safely enabling or disabling a supported laptop’s internal keyboard.
 
 Perfect for laptop-on-a-stand setups, external mechanical keyboards, desk setups, or anyone who has ever rested their hand on their laptop and accidentally typed:
 
 `hjjjjjjjjjjjjjjjj`
 
-Been there. 💀
+
 
 KeyFlip works on both **Wayland and X11** and leaves your external USB and Bluetooth keyboards alone.
 
@@ -27,12 +27,6 @@ I figured out how to disable the internal keyboard through Linux, made a script 
 > okay... why isn't this just a cute little button?
 
 So I made one.
-
-KeyFlip isn't trying to become some giant system-management suite.
-
-It has one job:
-
-**flip the laptop keyboard on or off without making you dig through terminal commands every time.**
 
 ---
 
