@@ -1,4 +1,4 @@
-# Fedora Internal Keyboard Toggle
+# Internal Laptop Keyboard Toggle
 
 A simple script to enable or disable a supported laptop’s internal keyboard on Fedora GNOME. Works with Wayland and X11.
 
