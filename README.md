@@ -4,6 +4,16 @@
 
 **KeyFlip 0.1.0-beta** is a polished Fedora GNOME utility for safely enabling or disabling a supported laptop's internal keyboard. It works on Wayland and X11 and leaves external USB and Bluetooth keyboards untouched.
 
+### AI Assistance
+
+This project was developed with the assistance of AI tools during parts of the coding, debugging, planning, and learning process.
+
+AI did not independently create or maintain this project. I chose the project’s direction, tested the software, made implementation decisions, reviewed and modified the code, and remain responsible for the final result.
+
+I’m still actively learning software development, and I use AI as one of several tools to help me understand concepts, troubleshoot problems, and build things I find useful.
+
+If you find a bug or have suggestions for improving KeyFlip, contributions and feedback are welcome.
+
 ## Requirements
 
 - Fedora Linux with GNOME
