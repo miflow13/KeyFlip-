@@ -1,7 +1,8 @@
-<img width="1920" height="1080" alt="Screenshot From 2026-09-04 14-45-58" src="https://github.com/user-attachments/assets/e7b85154-c4ca-4b0c-81e3-02105e84a938" />
-<img width="1920" height="1080" alt="Screenshot From 2026-09-04 14-45-56" src="https://github.com/user-attachments/assets/063db502-278d-4750-ba72-1b9239916d55" />
-# ✨ KeyFlip
+<img width="1536" height="1023" alt="Screenshot From 2026-09-04 15-56-56" src="https://github.com/user-attachments/assets/ed68bfef-b275-4c72-8a8b-a98021579358" />
+<img width="1539" height="1023" alt="Screenshot From 2026-09-04 15-57-06" src="https://github.com/user-attachments/assets/f95e26bc-903c-453a-9ee1-946c66c41eaf" />
 
+
+# ✨ KeyFlip
 **KeyFlip** is a small GNOME utility for enabling or disabling a supported laptop's internal keyboard.
 
 Useful when you're using an external keyboard and want to avoid accidental input from the built-in one.
