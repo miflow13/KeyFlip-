@@ -2,8 +2,7 @@
 
 A simple script to enable or disable a supported laptop’s internal keyboard on Fedora GNOME. Works with Wayland and X11.
 
-Supports standard **i8042/AT internal keyboards**. If no supported keyboard is found, the script exits without making changes.
-
+Designed for Linux laptops with an i8042/AT internal keyboard. Developed for Fedora; other distributions have not been tested.
 ## Install
 
 Download `internal-keyboard`, open a terminal in the folder containing it, and run:
