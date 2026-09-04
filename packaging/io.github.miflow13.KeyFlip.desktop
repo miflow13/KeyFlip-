@@ -2,7 +2,7 @@
 Type=Application
 Name=KeyFlip
 Comment=Toggle your laptop's internal keyboard
-Exec=/usr/local/bin/keyflip
+Exec=keyflip
 Icon=io.github.miflow13.KeyFlip
 Terminal=false
 Categories=Utility;
