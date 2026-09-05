@@ -54,6 +54,35 @@ Currently built and tested for:
 
 ## Install
 
+### Fedora (recommended)
+
+KeyFlip is available through COPR for Fedora users:
+
+```bash
+sudo dnf copr enable mikachu/keyflip
+sudo dnf install keyflip
+```
+
+After installation, launch **KeyFlip** from your applications menu or run:
+
+```bash
+keyflip
+```
+
+To uninstall the COPR package:
+
+```bash
+sudo dnf remove keyflip
+```
+
+To also disable the COPR repository:
+
+```bash
+sudo dnf copr remove mikachu/keyflip
+```
+
+### Manual install
+
 Download and extract:
 
 `keyflip-0.2.0-beta.tar.gz`
