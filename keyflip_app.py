@@ -38,7 +38,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         header_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         heading = Gtk.Label(label=APP_NAME, xalign=0)
         heading.add_css_class("title-1")
-        subtitle = Gtk.Label(label="Laptop input profiles", xalign=0)
+        subtitle = Gtk.Label(label="Laptop keyboard control", xalign=0)
         subtitle.add_css_class("dim-label")
         header_text.append(heading)
         header_text.append(subtitle)
