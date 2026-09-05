@@ -3,24 +3,69 @@
   <id>io.github.miflow13.KeyFlip</id>
   <name>KeyFlip</name>
   <summary>Switch your laptop between portable and desk setups</summary>
+
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>LicenseRef-proprietary</project_license>
+  <project_license>MIT</project_license>
+
   <description>
-    <p>KeyFlip combines a full GTK app, GNOME panel menu, global shortcut, and automatic mode switching in one installation.</p>
-    <p>KeyFlip provides simple Laptop Mode and Desk Mode presets for controlling a supported i8042 laptop keyboard on Fedora GNOME.</p>
+    <p>
+      KeyFlip is a GNOME utility for safely enabling or disabling a supported
+      laptop's internal keyboard while keeping external USB and Bluetooth
+      keyboards available.
+    </p>
+    <p>
+      Use Laptop Mode when you want the built-in keyboard active, or Desk Mode
+      when you are working with an external keyboard and want to avoid accidental
+      input. KeyFlip also includes GNOME panel controls, a global shortcut, and
+      optional automatic switching when external keyboards connect or disconnect.
+    </p>
+    <p>
+      KeyFlip currently supports standard i8042/AT internal keyboards and is
+      designed for Fedora GNOME on Wayland and X11.
+    </p>
   </description>
+
   <url type="homepage">https://github.com/miflow13/KeyFlip-</url>
+  <url type="bugtracker">https://github.com/miflow13/KeyFlip-/issues</url>
+  <url type="vcs-browser">https://github.com/miflow13/KeyFlip-</url>
+
   <launchable type="desktop-id">io.github.miflow13.KeyFlip.desktop</launchable>
+
   <developer id="io.github.miflow13">
     <name>Miflow13</name>
   </developer>
+
+  <provides>
+    <binary>keyflip</binary>
+  </provides>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/miflow13/KeyFlip-/main/screenshots/keyflip-app-enabled.png</image>
+      <caption>KeyFlip with the internal keyboard enabled in Laptop Mode</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/miflow13/KeyFlip-/main/screenshots/keyflip-status-control.png</image>
+      <caption>GNOME panel controls for switching KeyFlip modes</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/miflow13/KeyFlip-/main/screenshots/keyflip-enabled.png</image>
+      <caption>KeyFlip status and keyboard controls</caption>
+    </screenshot>
+  </screenshots>
+
   <content_rating type="oars-1.1" />
+
   <releases>
     <release version="0.2.0-beta" date="2026-09-04">
-      <description><p>Adds Laptop Mode and Desk Mode presets with external-keyboard safety checks.</p></description>
+      <description>
+        <p>Adds Laptop Mode and Desk Mode presets, GNOME panel controls, a global shortcut, and external-keyboard safety checks.</p>
+      </description>
     </release>
     <release version="0.1.0-beta" date="2026-09-04">
-      <description><p>Initial beta release.</p></description>
+      <description>
+        <p>Initial beta release.</p>
+      </description>
     </release>
   </releases>
 </component>
