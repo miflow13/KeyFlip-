@@ -6,7 +6,7 @@ pkgrel=1
 pkgdesc="Toggle a supported laptop internal keyboard on Linux"
 arch=('any')
 url="https://github.com/miflow13/KeyFlip-"
-license=('custom:proprietary')
+license=('MIT')
 depends=('gtk4' 'python' 'python-gobject' 'polkit' 'util-linux' 'systemd' 'libcanberra' 'glib2' 'gnome-shell')
 conflicts=('keyflip-core' 'gnome-shell-extension-keyflip')
 replaces=('keyflip-core' 'gnome-shell-extension-keyflip')
@@ -35,6 +35,8 @@ package() {
         "$pkgdir/usr/share/keyflip/sounds/toggle-off.ogg"
     install -Dm644 "$source_dir/README.md" \
         "$pkgdir/usr/share/doc/keyflip/README.md"
+    install -Dm644 "$source_dir/LICENSE" \
+        "$pkgdir/usr/share/licenses/keyflip/LICENSE"
     install -Dm644 "$source_dir/app.py" "$pkgdir/usr/libexec/keyflip/app.py"
     install -Dm644 "$source_dir/keyflip_app.py" \
         "$pkgdir/usr/libexec/keyflip/keyflip_app.py"
