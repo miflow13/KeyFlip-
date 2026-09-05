@@ -2,7 +2,7 @@ Name:           keyflip
 Version:        0.2.0
 Release:        0.beta%{?dist}
 Summary:        Laptop keyboard modes with a GTK app and GNOME panel controls
-License:        LicenseRef-Proprietary
+License:        MIT
 URL:            https://github.com/miflow13/KeyFlip-
 Source0:        keyflip-%{version}-beta.tar.gz
 BuildArch:      noarch
@@ -61,6 +61,7 @@ install -m644 gnome-extension/extension.js gnome-extension/metadata.json \
     gnome-extension/stylesheet.css gnome-extension/*.svg "$extension_dir/"
 
 %files
+%license LICENSE
 %doc README.md
 %{_bindir}/keyflip
 %{_libexecdir}/keyflip/app.py
