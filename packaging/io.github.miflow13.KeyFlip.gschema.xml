@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
   <schema id="io.github.miflow13.KeyFlip" path="/io/github/miflow13/KeyFlip/">
+    <key name="toggle-mode-shortcut" type="as">
+      <default>['&lt;Super&gt;&lt;Shift&gt;k']</default>
+      <summary>Global mode toggle shortcut</summary>
+      <description>Keyboard shortcuts that switch between Laptop Mode and Desk Mode while the GNOME extension is enabled. An empty list disables the shortcut.</description>
+    </key>
     <key name="automatic-mode-switching" type="b">
       <default>false</default>
       <summary>Automatically switch input modes</summary>

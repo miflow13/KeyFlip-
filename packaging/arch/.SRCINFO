@@ -1,6 +1,6 @@
 pkgbase = keyflip
 	pkgdesc = Toggle a supported laptop internal keyboard on Linux
-	pkgver = 0.1.0_beta
+	pkgver = 0.2.0_beta
 	pkgrel = 1
 	url = https://github.com/miflow13/KeyFlip-
 	arch = any
@@ -12,7 +12,13 @@ pkgbase = keyflip
 	depends = util-linux
 	depends = systemd
 	depends = libcanberra
-	source = keyflip-0.1.0_beta.tar.gz::https://github.com/miflow13/KeyFlip-/archive/refs/tags/v0.1.0-beta.tar.gz
-	sha256sums = 387b9c741298f50fd2df079130487e456c4e190cce4fecc2ccd45fb15628a158
+	depends = glib2
+	depends = gnome-shell
+	conflicts = keyflip-core
+	conflicts = gnome-shell-extension-keyflip
+	replaces = keyflip-core
+	replaces = gnome-shell-extension-keyflip
+	source = keyflip-0.2.0-beta.tar.gz
+	sha256sums = 8f93b16fa658145c93c05b8a904f168df5e0f18f2fea9a781d942555eed4c800
 
 pkgname = keyflip

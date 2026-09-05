@@ -165,7 +165,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         automatic_title = Gtk.Label(label="Automatic mode switching", xalign=0)
         automatic_title.add_css_class("title-3")
         automatic_description = Gtk.Label(
-            label="Let the GNOME extension switch modes for external keyboards", xalign=0
+            label="Switch when an external keyboard connects or disconnects", xalign=0
         )
         automatic_description.add_css_class("dim-label")
         automatic_text.append(automatic_title)
@@ -604,8 +604,11 @@ def load_css():
 
 
 def on_activate(application):
-    load_css()
-    KeyboardWindow(application).present()
+    window = application.get_active_window()
+    if window is None:
+        load_css()
+        window = KeyboardWindow(application)
+    window.present()
 
 
 app = Gtk.Application(application_id="io.github.miflow13.KeyFlip")

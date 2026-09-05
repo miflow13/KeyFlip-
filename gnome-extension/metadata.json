@@ -1,7 +1,7 @@
 {
   "uuid": "keyflip@miflow13.github.io",
   "name": "KeyFlip",
-  "description": "Toggle the internal laptop keyboard or disable it automatically when an external keyboard connects.",
+  "description": "KeyFlip panel controls, global shortcut, and automatic mode switching. Open the full KeyFlip app from the panel menu.",
   "shell-version": ["50"],
   "url": "https://github.com/miflow13/KeyFlip-",
   "version": 17

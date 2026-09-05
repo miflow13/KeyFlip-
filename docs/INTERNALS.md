@@ -53,12 +53,13 @@ keyflip_app.py                  gnome-extension/extension.js
              /sys/bus/serio/drivers/atkbd
 ```
 
-There are two front ends but only one component that knows how to manipulate
+One KeyFlip package includes the GTK app, GNOME Shell integration, and helper.
+There are two UI processes but only one component that knows how to manipulate
 the kernel. This separation is deliberate:
 
 - The GUI owns presentation, mode selection, warnings, and progress feedback.
-- The extension owns panel integration, automatic detection, animation, and
-  shell notifications.
+- The bundled extension owns the panel menu, global shortcut, automatic detection,
+  animation, and shell notifications. Its Open KeyFlip action launches the full app.
 - The helper owns device discovery, validation, locking, and kernel writes.
 - Polkit decides whether a user may run the helper with administrator rights.
 
@@ -346,6 +347,15 @@ modules.
 timers. Cleaning timers is essential because an extension can be reloaded many
 times in one Shell session.
 
+The extension also registers `toggle-mode-shortcut` through `Main.wm.addKeybinding`
+on enable and removes it on disable. Its GSettings string-array default is
+`<Super><Shift>k`, so a future preferences UI can edit the binding without changing
+the toggle code. GNOME handles binding changes live. The shortcut works in normal
+application windows and the overview, ignores key autorepeat, and calls the same
+`_requestEnabled()` path as the panel mode actions, preserving confirmation and
+feedback. Unsupported hardware disables the mode actions while leaving Open
+KeyFlip available. Opening the app again presents its existing window.
+
 ### Polling
 
 The extension currently uses two timers:
@@ -414,18 +424,16 @@ Editing a repository file does not update either installed copy. This caused a
 real debugging trap during development: source contained a fixed dialog while
 the desktop launcher still ran the old installed `Gtk.MessageDialog` code.
 
-After GUI changes:
+After app or panel changes, reinstall the whole app:
 
 ```bash
-sudo ./install.sh --gui-only
-keyflip
+sudo ./install.sh
 ```
 
-After extension changes:
+Log out and back in to load updated extension code. On first install, enable the
+bundled panel integration:
 
 ```bash
-sudo ./install.sh --extension-only
-gnome-extensions disable keyflip@miflow13.github.io
 gnome-extensions enable keyflip@miflow13.github.io
 ```
 

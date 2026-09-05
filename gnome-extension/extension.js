@@ -2,15 +2,20 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Clutter from 'gi://Clutter';
+import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 const HELPER = '/usr/libexec/keyflip/keyflip-helper';
 const SOUND_DIR = '/usr/share/keyflip/sounds';
 const SETTINGS_SCHEMA = 'io.github.miflow13.KeyFlip';
+const TOGGLE_KEYBINDING = 'toggle-mode-shortcut';
 
 // Clutter does not expose libadwaita's SpringAnimation, so these keyframes
 // approximate SpringParams.new(0.75, 1.7, 100.0) with initial_velocity -18.8.
@@ -23,15 +28,10 @@ const TOGGLE_SPRING_KEYFRAMES = [
 ];
 
 const KeyFlipIndicator = GObject.registerClass(
-class KeyFlipIndicator extends St.Button {
+class KeyFlipIndicator extends PanelMenu.Button {
     _init(extensionPath) {
-        super._init({
-            style_class: 'panel-button keyflip-panel-button',
-            reactive: true,
-            can_focus: true,
-            track_hover: true,
-            accessible_name: 'KeyFlip internal keyboard toggle',
-        });
+        super._init(0.0, 'KeyFlip');
+        this.add_style_class_name('keyflip-panel-button');
 
         this._extensionPath = extensionPath;
         this._settings = new Gio.Settings({schema_id: SETTINGS_SCHEMA});
@@ -39,8 +39,14 @@ class KeyFlipIndicator extends St.Button {
             style_class: 'keyflip-keyboard-icon',
         });
         this._keyboardIcon.set_pivot_point(0.5, 0.5);
-        this.set_child(this._keyboardIcon);
-        this.connect('clicked', () => this._toggle());
+        this.add_child(this._keyboardIcon);
+        this._modeLabel = new PopupMenu.PopupMenuItem('Checking keyboard…', {reactive: false});
+        this.menu.addMenuItem(this._modeLabel);
+        this._laptopAction = this.menu.addAction('Laptop Mode', () => this._requestEnabled(true));
+        this._deskAction = this.menu.addAction('Desk Mode', () => this._requestEnabled(false));
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        this.menu.addAction('Open KeyFlip', () => this._openApp());
+        this._syncMenu();
         this._refresh();
         this._externalKeyboardIds = new Set();
         this._externalKeyboardKnown = false;
@@ -74,6 +80,8 @@ class KeyFlipIndicator extends St.Button {
         );
         this.connect('destroy', () => {
             this._destroyed = true;
+            this._disableDialog?.destroy();
+            this._disableDialog = null;
             if (this._statusTimer) {
                 GLib.source_remove(this._statusTimer);
                 this._statusTimer = null;
@@ -117,9 +125,11 @@ class KeyFlipIndicator extends St.Button {
         if (this._destroyed)
             return;
         if (!success) {
+            this._enabled = undefined;
             this._keyboardIcon.gicon = null;
             this._keyboardIcon.icon_name = 'dialog-error-symbolic';
             this.accessible_name = `KeyFlip: ${output || 'status unavailable'}`;
+            this._syncMenu();
             return;
         }
 
@@ -129,29 +139,67 @@ class KeyFlipIndicator extends St.Button {
             `${this._extensionPath}/keyboard-${this._enabled ? 'enabled' : 'disabled'}.svg`
         );
         this.accessible_name = `Internal keyboard ${this._enabled ? 'enabled' : 'disabled'}`;
+        this._syncMenu();
     }
 
-    async _toggle() {
-        if (this._busy)
+    _syncMenu() {
+        const available = typeof this._enabled === 'boolean';
+        this._modeLabel.label.text = !available ? 'Keyboard unavailable' :
+            (this._enabled ? 'Laptop Mode active' : 'Desk Mode active');
+        const canChange = available && !this._busy && !this._requestPending;
+        this._laptopAction.setSensitive(canChange);
+        this._deskAction.setSensitive(canChange);
+        this._laptopAction.setOrnament(this._enabled === true ?
+            PopupMenu.Ornament.DOT : PopupMenu.Ornament.NONE);
+        this._deskAction.setOrnament(this._enabled === false ?
+            PopupMenu.Ornament.DOT : PopupMenu.Ornament.NONE);
+    }
+
+    _openApp() {
+        const app = Shell.AppSystem.get_default().lookup_app('io.github.miflow13.KeyFlip.desktop');
+        if (app)
+            app.activate();
+        else
+            Main.notify('KeyFlip could not open', 'Reinstall KeyFlip to restore the application launcher.');
+    }
+
+    _toggle() {
+        return this._requestEnabled(!this._enabled);
+    }
+
+    async _requestEnabled(enabling) {
+        if (this._destroyed || this._busy || this._requestPending || this._disableDialog ||
+            typeof this._enabled !== 'boolean' || enabling === this._enabled)
             return;
 
         // A manual choice ends the current automatic disable cycle.
         this._settings.set_boolean('automatic-disable-owned', false);
-        const enabling = !this._enabled;
-        if (!enabling) {
-            const [success, output] = await this._runAsync([HELPER, 'external-list']);
-            if (this._destroyed)
-                return;
-            if (!success || !output) {
-                this._confirmDisableWithoutExternalKeyboard();
-                return;
+        this._requestPending = true;
+        this._syncMenu();
+        try {
+            if (!enabling) {
+                const [success, output] = await this._runAsync([HELPER, 'external-list']);
+                if (this._destroyed)
+                    return;
+                if (!success || !output) {
+                    this._confirmDisableWithoutExternalKeyboard();
+                    return;
+                }
             }
+            await this._setEnabled(enabling);
+        } finally {
+            this._requestPending = false;
+            if (!this._destroyed)
+                this._syncMenu();
         }
-        this._setEnabled(enabling);
     }
 
     _confirmDisableWithoutExternalKeyboard() {
         const dialog = new ModalDialog.ModalDialog();
+        this._disableDialog = dialog;
+        dialog.connect('destroy', () => {
+            this._disableDialog = null;
+        });
         const title = new St.Label({
             text: 'No external keyboard detected',
             style_class: 'headline',
@@ -205,7 +253,10 @@ class KeyFlipIndicator extends St.Button {
         if (!this._settings.get_boolean('automatic-mode-switching'))
             return;
 
-        if (connected && this._enabled && !this._busy) {
+        if (this._busy || this._requestPending || this._disableDialog)
+            return;
+
+        if (connected && this._enabled) {
             this._setEnabled(false, true);
         }
         else if (!connected && wasKnown && wasConnected &&
@@ -216,6 +267,7 @@ class KeyFlipIndicator extends St.Button {
 
     async _setEnabled(enabling, automatic = false) {
         this._busy = true;
+        this._syncMenu();
         this._playSound(enabling);
         this._playToggleAnimation();
         this._keyboardIcon.opacity = 130;
@@ -227,9 +279,12 @@ class KeyFlipIndicator extends St.Button {
         ]);
         if (this._destroyed)
             return;
-        this._busy = false;
         this._keyboardIcon.opacity = 255;
-        this._refresh();
+        await this._refresh();
+        if (this._destroyed)
+            return;
+        this._busy = false;
+        this._syncMenu();
         if (success) {
             if (automatic)
                 this._settings.set_boolean('automatic-disable-owned', !enabling);
@@ -318,10 +373,20 @@ class KeyFlipIndicator extends St.Button {
 export default class KeyFlipExtension extends Extension {
     enable() {
         this._indicator = new KeyFlipIndicator(this.path);
-        Main.panel._rightBox.insert_child_at_index(this._indicator, 0);
+        Main.panel.addToStatusArea(this.uuid, this._indicator, 0, 'right');
+        this._settings = new Gio.Settings({schema_id: SETTINGS_SCHEMA});
+        Main.wm.addKeybinding(
+            TOGGLE_KEYBINDING,
+            this._settings,
+            Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
+            () => this._indicator._toggle()
+        );
     }
 
     disable() {
+        Main.wm.removeKeybinding(TOGGLE_KEYBINDING);
+        this._settings = null;
         this._indicator?.destroy();
         this._indicator = null;
     }

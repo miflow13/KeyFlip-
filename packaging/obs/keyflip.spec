@@ -1,44 +1,31 @@
 Name:           keyflip
-Version:        0.1.0
+Version:        0.2.0
 Release:        0.beta%{?dist}
-Summary:        GTK interface for controlling a laptop internal keyboard
+Summary:        Laptop keyboard modes with a GTK app and GNOME panel controls
 License:        LicenseRef-Proprietary
 URL:            https://github.com/miflow13/KeyFlip-
-Source0:        %{url}/archive/refs/tags/v0.1.0-beta.tar.gz#/keyflip-%{version}.tar.gz
+Source0:        keyflip-%{version}-beta.tar.gz
 BuildArch:      noarch
 
-Requires:       keyflip-core = %{version}-%{release}
 Requires:       python3
 Requires:       python3-gobject
 Requires:       gtk4
-
-%description
-KeyFlip provides a GTK 4 interface for enabling and disabling a supported
-i8042/AT laptop keyboard while leaving external keyboards available.
-
-%package core
-Summary:        Shared helper and resources for KeyFlip
 Requires:       polkit
 Requires:       util-linux
 Requires:       systemd
 Requires:       libcanberra-gtk3
 Requires:       glib2
-
-%description core
-Privileged keyboard control helper, authorization policy, and shared sounds
-used by the KeyFlip GTK application and GNOME Shell extension.
-
-%package -n gnome-shell-extension-keyflip
-Summary:        KeyFlip indicator for GNOME Shell
-Requires:       keyflip-core = %{version}-%{release}
 Requires:       gnome-shell
+Obsoletes:      keyflip-core <= %{version}-%{release}
+Obsoletes:      gnome-shell-extension-keyflip <= %{version}-%{release}
 
-%description -n gnome-shell-extension-keyflip
-GNOME Shell top-bar indicator for controlling a supported laptop internal
-keyboard through the shared KeyFlip helper.
+%description
+KeyFlip combines a GTK 4 application, GNOME Shell panel controls, a global
+shortcut, and automatic mode switching in one package for supported i8042/AT
+laptop keyboards.
 
 %prep
-%autosetup -n KeyFlip--%{version}-beta
+%autosetup -n keyflip-%{version}-beta
 sed -i 's|Exec=/usr/local/bin/keyflip|Exec=keyflip|' \
     packaging/io.github.miflow13.KeyFlip.desktop
 
@@ -82,15 +69,16 @@ install -m644 gnome-extension/extension.js gnome-extension/metadata.json \
 %{_datadir}/icons/hicolor/512x512/apps/io.github.miflow13.KeyFlip.png
 %{_datadir}/metainfo/io.github.miflow13.KeyFlip.metainfo.xml
 
-%files core
 %{_libexecdir}/keyflip/keyflip-helper
 %{_datadir}/keyflip/
 %{_datadir}/polkit-1/actions/io.github.miflow13.KeyFlip.policy
 %{_datadir}/glib-2.0/schemas/io.github.miflow13.KeyFlip.gschema.xml
 
-%files -n gnome-shell-extension-keyflip
 %{_datadir}/gnome-shell/extensions/keyflip@miflow13.github.io/
 
 %changelog
+* Sat Sep 05 2026 Miflow13 <pizzafan513@gmail.com> - 0.2.0-0.beta
+- Bundle the GTK app, GNOME panel integration, and shared resources as KeyFlip
+
 * Fri Sep 04 2026 Miflow13 <pizzafan513@gmail.com> - 0.1.0-0.beta
 - Split the shared core, GTK GUI, and GNOME Shell extension packages
