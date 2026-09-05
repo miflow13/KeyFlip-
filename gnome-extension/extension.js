@@ -13,6 +13,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 const HELPER = '/usr/libexec/keyflip/keyflip-helper';
+const APP = '/usr/libexec/keyflip/app.py';
 const SOUND_DIR = '/usr/share/keyflip/sounds';
 const SETTINGS_SCHEMA = 'io.github.miflow13.KeyFlip';
 const TOGGLE_KEYBINDING = 'toggle-mode-shortcut';
@@ -46,6 +47,9 @@ class KeyFlipIndicator extends PanelMenu.Button {
         this._deskAction = this.menu.addAction('Desk Mode', () => this._requestEnabled(false));
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this.menu.addAction('Open KeyFlip', () => this._openApp());
+        this.menu.addAction('Preferences', () => this._runApp('--preferences'));
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        this._quitAction = this.menu.addAction('Quit', () => this._quit());
         this._syncMenu();
         this._refresh();
         this._externalKeyboardIds = new Set();
@@ -146,7 +150,9 @@ class KeyFlipIndicator extends PanelMenu.Button {
         const available = typeof this._enabled === 'boolean';
         this._modeLabel.label.text = !available ? 'Keyboard unavailable' :
             (this._enabled ? 'Laptop Mode active' : 'Desk Mode active');
-        const canChange = available && !this._busy && !this._requestPending;
+        const idle = !this._busy && !this._requestPending && !this._quitting;
+        const canChange = available && idle;
+        this._quitAction.setSensitive(idle && !this._disableDialog);
         this._laptopAction.setSensitive(canChange);
         this._deskAction.setSensitive(canChange);
         this._laptopAction.setOrnament(this._enabled === true ?
@@ -163,12 +169,33 @@ class KeyFlipIndicator extends PanelMenu.Button {
             Main.notify('KeyFlip could not open', 'Reinstall KeyFlip to restore the application launcher.');
     }
 
+    async _runApp(option) {
+        const [success, output] = await this._runAsync(['/usr/bin/python3', APP, option]);
+        if (!success)
+            Main.notify('KeyFlip could not complete the action', output);
+        return success;
+    }
+
+    async _quit() {
+        if (this._busy || this._requestPending || this._quitting || this._disableDialog)
+            return;
+        this._quitting = true;
+        this._syncMenu();
+        const accepted = await this._runApp('--quit');
+        if (accepted)
+            this._stopBackground();
+        if (!this._destroyed) {
+            this._quitting = false;
+            this._syncMenu();
+        }
+    }
+
     _toggle() {
         return this._requestEnabled(!this._enabled);
     }
 
     async _requestEnabled(enabling) {
-        if (this._destroyed || this._busy || this._requestPending || this._disableDialog ||
+        if (this._destroyed || this._busy || this._requestPending || this._quitting || this._disableDialog ||
             typeof this._enabled !== 'boolean' || enabling === this._enabled)
             return;
 
@@ -253,7 +280,7 @@ class KeyFlipIndicator extends PanelMenu.Button {
         if (!this._settings.get_boolean('automatic-mode-switching'))
             return;
 
-        if (this._busy || this._requestPending || this._disableDialog)
+        if (this._busy || this._requestPending || this._quitting || this._disableDialog)
             return;
 
         if (connected && this._enabled) {
@@ -372,9 +399,20 @@ class KeyFlipIndicator extends PanelMenu.Button {
 
 export default class KeyFlipExtension extends Extension {
     enable() {
+        this._settings = new Gio.Settings({schema_id: SETTINGS_SCHEMA});
+        this._backgroundChangedId = this._settings.connect('changed::background-enabled', () => this._syncBackground());
+        this._syncBackground();
+    }
+
+    _syncBackground() {
+        if (!this._settings.get_boolean('background-enabled')) {
+            this._stopBackground();
+            return;
+        }
+        if (this._indicator)
+            return;
         this._indicator = new KeyFlipIndicator(this.path);
         Main.panel.addToStatusArea(this.uuid, this._indicator, 0, 'right');
-        this._settings = new Gio.Settings({schema_id: SETTINGS_SCHEMA});
         Main.wm.addKeybinding(
             TOGGLE_KEYBINDING,
             this._settings,
@@ -384,10 +422,20 @@ export default class KeyFlipExtension extends Extension {
         );
     }
 
-    disable() {
+    _stopBackground() {
+        if (!this._indicator)
+            return;
         Main.wm.removeKeybinding(TOGGLE_KEYBINDING);
-        this._settings = null;
-        this._indicator?.destroy();
+        this._indicator.destroy();
         this._indicator = null;
+    }
+
+    disable() {
+        if (this._backgroundChangedId) {
+            this._settings.disconnect(this._backgroundChangedId);
+            this._backgroundChangedId = null;
+        }
+        this._stopBackground();
+        this._settings = null;
     }
 }

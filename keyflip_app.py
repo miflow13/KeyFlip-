@@ -20,6 +20,46 @@ PKEXEC = "/usr/bin/pkexec"
 SETTINGS_SCHEMA = "io.github.miflow13.KeyFlip"
 
 
+class PreferencesWindow(Gtk.Window):
+    def __init__(self, parent):
+        super().__init__(title="KeyFlip Preferences", transient_for=parent,
+                         application=parent.get_application(), modal=True, resizable=False)
+        self.set_default_size(460, -1)
+        self.set_titlebar(Gtk.HeaderBar())
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        for side in ("top", "bottom", "start", "end"):
+            getattr(content, f"set_margin_{side}")(24)
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18)
+        label = Gtk.Label(label="Automatic mode switching", xalign=0, hexpand=True)
+        label.add_css_class("title-3")
+        row.append(label)
+        automatic = Gtk.Switch(valign=Gtk.Align.CENTER)
+        parent.settings.bind("automatic-mode-switching", automatic, "active", Gio.SettingsBindFlags.DEFAULT)
+        automatic.connect("notify::active", parent.on_automatic_switch_changed)
+        row.append(automatic)
+        content.append(row)
+        description = Gtk.Label(
+            label="Switch to Desk Mode when an external keyboard connects and restore Laptop Mode when it disconnects.",
+            xalign=0, wrap=True, max_width_chars=48,
+        )
+        description.add_css_class("dim-label")
+        content.append(description)
+        content.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+        shortcut = Gtk.Label(xalign=0, wrap=True)
+        def update_shortcut(settings, _key=None):
+            labels = []
+            for binding in settings.get_strv("toggle-mode-shortcut"):
+                valid, key, modifiers = Gtk.accelerator_parse(binding)
+                if valid:
+                    labels.append(Gtk.accelerator_get_label(key, modifiers))
+            shortcut.set_text("Toggle mode shortcut: " + (", ".join(labels) or "Disabled"))
+        update_shortcut(parent.settings)
+        handler = parent.settings.connect("changed::toggle-mode-shortcut", update_shortcut)
+        self.connect("close-request", lambda _window: parent.settings.disconnect(handler))
+        content.append(shortcut)
+        self.set_child(content)
+
+
 class KeyboardWindow(Gtk.ApplicationWindow):
     def __init__(self, application):
         super().__init__(application=application, title=APP_NAME)
@@ -50,6 +90,11 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         self.refresh_button.set_tooltip_text("Refresh keyboard status")
         self.refresh_button.connect("clicked", lambda _: self.refresh_status())
         header.pack_end(self.refresh_button)
+        preferences_button = Gtk.Button.new_from_icon_name("emblem-system-symbolic")
+        preferences_button.add_css_class("flat")
+        preferences_button.set_tooltip_text("Preferences")
+        preferences_button.connect("clicked", lambda _button: self.show_preferences())
+        header.pack_end(preferences_button)
         self.set_titlebar(header)
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
@@ -176,6 +221,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         )
         self.automatic_switch.set_valign(Gtk.Align.CENTER)
         self.automatic_switch.connect("notify::active", self.on_automatic_switch_changed)
+        self.settings.bind("automatic-mode-switching", self.automatic_switch, "active", Gio.SettingsBindFlags.GET)
         automatic_row.append(self.automatic_switch)
         controls.append(automatic_row)
         controls_frame.set_child(controls)
@@ -201,9 +247,20 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         self.busy = False
         self.refreshing = False
         self.safety_dialog = None
+        self.preferences_window = None
         self.refresh_status()
         self.status_timer = GLib.timeout_add_seconds(1, self.sync_status)
         self.connect("close-request", self.stop_status_sync)
+
+    def show_preferences(self):
+        if self.preferences_window is None:
+            self.preferences_window = PreferencesWindow(self)
+            self.preferences_window.connect("close-request", self.on_preferences_closed)
+        self.preferences_window.present()
+
+    def on_preferences_closed(self, _window):
+        self.preferences_window = None
+        return False
 
     @staticmethod
     def create_mode_button(icon_name, title, description):
@@ -604,15 +661,97 @@ def load_css():
 
 
 def on_activate(application):
-    window = application.get_active_window()
+    if getattr(application, "quitting", False):
+        return None
+    window = next((window for window in application.get_windows()
+                   if isinstance(window, KeyboardWindow)), None)
     if window is None:
         load_css()
         window = KeyboardWindow(application)
+    window.settings.set_boolean("background-enabled", True)
     window.present()
+    return window
 
 
-app = Gtk.Application(application_id="io.github.miflow13.KeyFlip")
+def restore_keyboard_for_quit():
+    status = KeyboardWindow.run_command("status")
+    message = KeyboardWindow.result_message(status)
+    if status.returncode != 0:
+        # A desktop with unsupported hardware still needs to be able to quit.
+        if "No single supported i8042 internal keyboard found" in message:
+            return None
+        return message or "The keyboard status could not be checked."
+    if "enabled" in message:
+        return None
+    result = KeyboardWindow.run_command("enable", privileged=True)
+    if result.returncode != 0:
+        return KeyboardWindow.result_message(result) or "Restoring Laptop Mode was cancelled or failed."
+    status = KeyboardWindow.run_command("status")
+    if status.returncode != 0 or "enabled" not in KeyboardWindow.result_message(status):
+        return "The internal keyboard could not be confirmed enabled."
+    return None
+
+
+def request_quit(application):
+    application.quitting = True
+    application.hold()
+    settings = Gio.Settings.new(SETTINGS_SCHEMA)
+    settings.set_boolean("background-enabled", False)
+    Gio.Settings.sync()
+    for window in application.get_windows():
+        if isinstance(window, KeyboardWindow):
+            window.close_safety_dialog()
+            window.set_busy(True)
+
+    def complete(error):
+        application.quitting = False
+        if error:
+            window = on_activate(application)
+            window.set_busy(False)
+            window.show_toggle_result(1, f"KeyFlip is still running because Laptop Mode could not be restored. {error}")
+        else:
+            settings.set_boolean("automatic-disable-owned", False)
+            Gio.Settings.sync()
+            application.quit()
+        application.release()
+        return GLib.SOURCE_REMOVE
+
+    def restore():
+        try:
+            error = restore_keyboard_for_quit()
+        except Exception as error:
+            GLib.idle_add(complete, str(error))
+        else:
+            GLib.idle_add(complete, error)
+
+    threading.Thread(target=restore, daemon=True).start()
+
+
+def on_command_line(application, command_line):
+    options = command_line.get_options_dict()
+    arguments = command_line.get_arguments()
+    if getattr(application, "quitting", False):
+        command_line.printerr_literal("KeyFlip is restoring Laptop Mode before quitting.\n")
+        return 1
+    if options.contains("quit") or "--quit" in arguments:
+        # Do not exit while the GUI is applying a keyboard change.
+        if any(getattr(window, "busy", False) for window in application.get_windows()):
+            command_line.printerr_literal("KeyFlip is changing modes. Try Quit again once it finishes.\n")
+            return 1
+        request_quit(application)
+        return 0
+    window = on_activate(application)
+    if options.contains("preferences") or "--preferences" in arguments:
+        window.show_preferences()
+    return 0
+
+
+app = Gtk.Application(application_id="io.github.miflow13.KeyFlip",
+                      flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+for option, description in (("preferences", "Open Preferences"), ("quit", "Quit KeyFlip")):
+    app.add_main_option(option, 0, GLib.OptionFlags.NONE, GLib.OptionArg.NONE, description, None)
 app.connect("activate", on_activate)
+app.connect("command-line", on_command_line)
 
 
 if __name__ == "__main__":

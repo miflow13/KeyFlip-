@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
   <schema id="io.github.miflow13.KeyFlip" path="/io/github/miflow13/KeyFlip/">
+    <key name="background-enabled" type="b">
+      <default>true</default>
+      <summary>Run KeyFlip in the background</summary>
+      <description>Quit pauses the panel, global shortcut, and automatic switching. Opening KeyFlip resumes them.</description>
+    </key>
     <key name="toggle-mode-shortcut" type="as">
       <default>['&lt;Super&gt;&lt;Shift&gt;k']</default>
       <summary>Global mode toggle shortcut</summary>
