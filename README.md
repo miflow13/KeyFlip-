@@ -1,10 +1,10 @@
 <img width="800" height="450" alt="KeyFlip demo" src="https://github.com/user-attachments/assets/4f224ba1-1f8a-47b8-b3d8-36cad5cf97ed" />
 
+[![Copr build status](https://copr.fedorainfracloud.org/coprs/mikachu/keyflip/package/keyflip/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/mikachu/keyflip/package/keyflip/)
 
 **KeyFlip** is a GNOME app with built-in panel controls for enabling or disabling a supported laptop's internal keyboard.
 
 Useful when you're using an external keyboard and want to avoid accidental input from the built-in one.
-
 
 ## Features
 
@@ -20,11 +20,10 @@ Useful when you're using an external keyboard and want to avoid accidental input
 - One install includes the full app, panel menu, and global shortcut
 - Open the full app directly from the panel menu
 
-  ## Screenshots
+## Screenshots
+
 <img width="1920" height="1080" alt="Screenshot From 2026-09-04 19-30-01" src="https://github.com/user-attachments/assets/f43d125f-4547-4a41-83c9-76d11ffc778d" />
 <img width="1920" height="1080" alt="Screenshot From 2026-09-04 19-29-57" src="https://github.com/user-attachments/assets/f9233967-490a-4506-992e-ba2315ce6e88" />
-
-
 
 ## Requirements
 
