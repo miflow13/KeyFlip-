@@ -1,5 +1,6 @@
 
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -563,7 +564,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
 def load_css():
     provider = Gtk.CssProvider()
     provider.load_from_data(b"""
-        window {
+        window, headerbar.app-header {
             background: @window_bg_color;
             color: @window_fg_color;
         }
@@ -755,4 +756,4 @@ app.connect("command-line", on_command_line)
 
 
 if __name__ == "__main__":
-    app.run(None)
+    sys.exit(app.run(sys.argv))
