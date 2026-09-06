@@ -18,6 +18,7 @@ install -m 755 "$project_dir/helper/keyflip-helper" "$bundle/helper/keyflip-help
 install -m 755 "$project_dir/install.sh" "$bundle/install.sh"
 install -m 755 "$project_dir/uninstall.sh" "$bundle/uninstall.sh"
 install -m 644 "$project_dir/README.md" "$bundle/README.md"
+install -m 644 "$project_dir/CHANGELOG.md" "$bundle/CHANGELOG.md"
 install -m 644 "$project_dir/LICENSE" "$bundle/LICENSE"
 install -m 644 "$project_dir/assets/keyflip.png" "$bundle/assets/keyflip.png"
 install -m 644 "$project_dir/assets/sounds/"*.ogg "$bundle/assets/sounds/"

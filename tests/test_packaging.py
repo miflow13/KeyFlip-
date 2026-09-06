@@ -26,6 +26,8 @@ class PackagingLayoutTests(unittest.TestCase):
             self.assertIn("helper/keyflip-helper", text)
         for text in (install, release, arch, rpm):
             self.assertIn("packaging/systemd/keyflip-recovery.service", text)
+        for text in (release, arch, rpm):
+            self.assertIn("CHANGELOG.md", text)
 
     def test_privileged_installed_path_is_stable(self):
         policy = (ROOT / "packaging/io.github.miflow13.KeyFlip.policy").read_text()

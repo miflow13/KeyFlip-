@@ -21,6 +21,6 @@ pkgbase = keyflip
 	replaces = keyflip-core
 	replaces = gnome-shell-extension-keyflip
 	source = keyflip-0.2.0-beta.tar.gz
-	sha256sums = 7fbc8d4f9f18dfb94d95f764d31ba2d7ec0e9204dde9f693a93eeb49d518ab76
+	sha256sums = 4bf4561e7d4ed37dabec775cb05035f8f1f876ed037fb2cab74f8ca23031c65d
 
 pkgname = keyflip

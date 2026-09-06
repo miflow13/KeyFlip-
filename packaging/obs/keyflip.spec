@@ -77,7 +77,7 @@ install -m644 gnome-extension/extension.js gnome-extension/metadata.json \
 
 %files
 %license LICENSE
-%doc README.md
+%doc README.md CHANGELOG.md
 %{_bindir}/keyflip
 %{_libexecdir}/keyflip/app.py
 %{_libexecdir}/keyflip/keyflip/

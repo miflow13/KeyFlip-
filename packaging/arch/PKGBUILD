@@ -13,7 +13,7 @@ conflicts=('keyflip-core' 'gnome-shell-extension-keyflip')
 replaces=('keyflip-core' 'gnome-shell-extension-keyflip')
 # Build this archive with make package and copy it next to the PKGBUILD.
 source=("keyflip-${pkgver//_/-}.tar.gz")
-sha256sums=('7fbc8d4f9f18dfb94d95f764d31ba2d7ec0e9204dde9f693a93eeb49d518ab76')
+sha256sums=('4bf4561e7d4ed37dabec775cb05035f8f1f876ed037fb2cab74f8ca23031c65d')
 
 prepare() {
     local source_dir="$srcdir/keyflip-0.2.0-beta"
@@ -36,6 +36,8 @@ package() {
         "$pkgdir/usr/share/keyflip/sounds/toggle-off.ogg"
     install -Dm644 "$source_dir/README.md" \
         "$pkgdir/usr/share/doc/keyflip/README.md"
+    install -Dm644 "$source_dir/CHANGELOG.md" \
+        "$pkgdir/usr/share/doc/keyflip/CHANGELOG.md"
     install -Dm644 "$source_dir/LICENSE" \
         "$pkgdir/usr/share/licenses/keyflip/LICENSE"
     install -Dm644 "$source_dir/app.py" "$pkgdir/usr/libexec/keyflip/app.py"
