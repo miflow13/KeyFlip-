@@ -1,9 +1,5 @@
 <p align="center">
-  <img
-    width="800"
-    alt="KeyFlip demo"
-    src="https://github.com/user-attachments/assets/4f224ba1-1f8a-47b8-b3d8-36cad5cf97ed"
-  />
+  <img src="./assets/keyflip-logo.png" alt="KeyFlip logo" width="600" />
 </p>
 
 # KeyFlip
