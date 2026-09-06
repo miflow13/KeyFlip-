@@ -3,16 +3,17 @@ pkgbase=keyflip
 pkgname=keyflip
 pkgver=0.2.0_beta
 pkgrel=1
+install=keyflip.install
 pkgdesc="Toggle a supported laptop internal keyboard on Linux"
 arch=('any')
 url="https://github.com/miflow13/KeyFlip-"
 license=('MIT')
-depends=('gtk4' 'python' 'python-gobject' 'polkit' 'util-linux' 'systemd' 'libcanberra' 'glib2' 'gnome-shell')
+depends=('gtk4' 'python' 'python-gobject' 'python-evdev' 'polkit' 'util-linux' 'systemd' 'libcanberra' 'glib2' 'gnome-shell')
 conflicts=('keyflip-core' 'gnome-shell-extension-keyflip')
 replaces=('keyflip-core' 'gnome-shell-extension-keyflip')
 # Build this archive with make package and copy it next to the PKGBUILD.
 source=("keyflip-${pkgver//_/-}.tar.gz")
-sha256sums=('8f93b16fa658145c93c05b8a904f168df5e0f18f2fea9a781d942555eed4c800')
+sha256sums=('7fbc8d4f9f18dfb94d95f764d31ba2d7ec0e9204dde9f693a93eeb49d518ab76')
 
 prepare() {
     local source_dir="$srcdir/keyflip-0.2.0-beta"
@@ -23,7 +24,7 @@ prepare() {
 package() {
     local source_dir="$srcdir/keyflip-0.2.0-beta"
 
-    install -Dm755 "$source_dir/keyflip-helper" \
+    install -Dm755 "$source_dir/helper/keyflip-helper" \
         "$pkgdir/usr/libexec/keyflip/keyflip-helper"
     install -Dm644 "$source_dir/packaging/io.github.miflow13.KeyFlip.policy" \
         "$pkgdir/usr/share/polkit-1/actions/io.github.miflow13.KeyFlip.policy"
@@ -38,8 +39,12 @@ package() {
     install -Dm644 "$source_dir/LICENSE" \
         "$pkgdir/usr/share/licenses/keyflip/LICENSE"
     install -Dm644 "$source_dir/app.py" "$pkgdir/usr/libexec/keyflip/app.py"
-    install -Dm644 "$source_dir/keyflip_app.py" \
-        "$pkgdir/usr/libexec/keyflip/keyflip_app.py"
+    install -Dm644 "$source_dir/src/keyflip/__init__.py" "$pkgdir/usr/libexec/keyflip/keyflip/__init__.py"
+    for module in application window state cleaning recovery sound; do
+        install -Dm644 "$source_dir/src/keyflip/$module.py" "$pkgdir/usr/libexec/keyflip/keyflip/$module.py"
+    done
+    install -Dm644 "$source_dir/packaging/systemd/keyflip-recovery.service" "$pkgdir/usr/lib/systemd/system/keyflip-recovery.service"
+    install -Dm644 "$source_dir/assets/sounds/cleaning-key.wav" "$pkgdir/usr/share/keyflip/sounds/cleaning-key.wav"
     install -Dm755 "$source_dir/keyflip" "$pkgdir/usr/bin/keyflip"
     install -Dm644 "$source_dir/assets/keyflip.png" \
         "$pkgdir/usr/share/icons/hicolor/512x512/apps/io.github.miflow13.KeyFlip.png"

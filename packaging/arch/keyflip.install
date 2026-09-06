@@ -1,0 +1,4 @@
+# Stop while the recovery executable and its Python dependencies still exist.
+pre_remove() {
+    systemctl stop keyflip-recovery.service
+}

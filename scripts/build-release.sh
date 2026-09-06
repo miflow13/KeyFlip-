@@ -6,12 +6,15 @@ project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 bundle="$stage/keyflip-$version"
-mkdir -p "$bundle/assets/sounds" "$bundle/packaging" "$bundle/gnome-extension"
+mkdir -p "$bundle/assets/sounds" "$bundle/packaging/systemd" "$bundle/gnome-extension" \
+    "$bundle/helper" "$bundle/src/keyflip"
 
 install -m 644 "$project_dir/app.py" "$bundle/app.py"
-install -m 644 "$project_dir/keyflip_app.py" "$bundle/keyflip_app.py"
+install -m 644 "$project_dir/src/keyflip/"*.py "$bundle/src/keyflip/"
+install -m 644 "$project_dir/packaging/systemd/keyflip-recovery.service" "$bundle/packaging/systemd/"
+install -m 644 "$project_dir/assets/sounds/cleaning-key.wav" "$bundle/assets/sounds/"
 install -m 755 "$project_dir/keyflip" "$bundle/keyflip"
-install -m 755 "$project_dir/keyflip-helper" "$bundle/keyflip-helper"
+install -m 755 "$project_dir/helper/keyflip-helper" "$bundle/helper/keyflip-helper"
 install -m 755 "$project_dir/install.sh" "$bundle/install.sh"
 install -m 755 "$project_dir/uninstall.sh" "$bundle/uninstall.sh"
 install -m 644 "$project_dir/README.md" "$bundle/README.md"

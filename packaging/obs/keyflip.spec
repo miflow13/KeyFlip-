@@ -6,9 +6,11 @@ License:        MIT
 URL:            https://github.com/miflow13/KeyFlip-
 Source0:        keyflip-%{version}-beta.tar.gz
 BuildArch:      noarch
+BuildRequires:  systemd-rpm-macros
 
 Requires:       python3
 Requires:       python3-gobject
+Requires:       python3-evdev
 Requires:       gtk4
 Requires:       polkit
 Requires:       util-linux
@@ -33,7 +35,7 @@ sed -i 's|Exec=/usr/local/bin/keyflip|Exec=keyflip|' \
 
 %install
 # Shared core
-install -Dm755 keyflip-helper %{buildroot}%{_libexecdir}/keyflip/keyflip-helper
+install -Dm755 helper/keyflip-helper %{buildroot}%{_libexecdir}/keyflip/keyflip-helper
 install -Dm644 packaging/io.github.miflow13.KeyFlip.policy \
     %{buildroot}%{_datadir}/polkit-1/actions/io.github.miflow13.KeyFlip.policy
 install -Dm644 packaging/io.github.miflow13.KeyFlip.gschema.xml \
@@ -45,7 +47,11 @@ install -Dm644 assets/sounds/toggle-off.ogg \
 
 # GTK GUI
 install -Dm644 app.py %{buildroot}%{_libexecdir}/keyflip/app.py
-install -Dm644 keyflip_app.py %{buildroot}%{_libexecdir}/keyflip/keyflip_app.py
+for module in __init__ application window state cleaning recovery sound; do
+    install -Dm644 "src/keyflip/$module.py" "%{buildroot}%{_libexecdir}/keyflip/keyflip/$module.py"
+done
+install -Dm644 packaging/systemd/keyflip-recovery.service %{buildroot}%{_unitdir}/keyflip-recovery.service
+install -Dm644 assets/sounds/cleaning-key.wav %{buildroot}%{_datadir}/keyflip/sounds/cleaning-key.wav
 install -Dm755 keyflip %{buildroot}%{_bindir}/keyflip
 install -Dm644 assets/keyflip.png \
     %{buildroot}%{_datadir}/icons/hicolor/512x512/apps/io.github.miflow13.KeyFlip.png
@@ -60,12 +66,22 @@ install -d "$extension_dir"
 install -m644 gnome-extension/extension.js gnome-extension/metadata.json \
     gnome-extension/stylesheet.css gnome-extension/*.svg "$extension_dir/"
 
+%post
+%systemd_post keyflip-recovery.service
+
+%preun
+%systemd_preun keyflip-recovery.service
+
+%postun
+%systemd_postun keyflip-recovery.service
+
 %files
 %license LICENSE
 %doc README.md
 %{_bindir}/keyflip
 %{_libexecdir}/keyflip/app.py
-%{_libexecdir}/keyflip/keyflip_app.py
+%{_libexecdir}/keyflip/keyflip/
+%{_unitdir}/keyflip-recovery.service
 %{_datadir}/applications/io.github.miflow13.KeyFlip.desktop
 %{_datadir}/icons/hicolor/512x512/apps/io.github.miflow13.KeyFlip.png
 %{_datadir}/metainfo/io.github.miflow13.KeyFlip.metainfo.xml

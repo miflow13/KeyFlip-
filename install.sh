@@ -29,7 +29,7 @@ source_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 install -d /usr/libexec/keyflip /usr/share/keyflip/sounds
 install -d /usr/share/polkit-1/actions
 install -d /usr/share/glib-2.0/schemas
-install -m 755 "$source_dir/keyflip-helper" /usr/libexec/keyflip/keyflip-helper
+install -m 755 "$source_dir/helper/keyflip-helper" /usr/libexec/keyflip/keyflip-helper
 install -m 644 "$source_dir/assets/sounds/"*.ogg /usr/share/keyflip/sounds/
 install -m 644 "$source_dir/packaging/io.github.miflow13.KeyFlip.policy" \
     /usr/share/polkit-1/actions/io.github.miflow13.KeyFlip.policy
@@ -40,7 +40,15 @@ glib-compile-schemas /usr/share/glib-2.0/schemas
 install -d /usr/local/bin /usr/local/share/applications
 install -d /usr/local/share/icons/hicolor/512x512/apps /usr/local/share/metainfo
 install -m 644 "$source_dir/app.py" /usr/libexec/keyflip/app.py
-install -m 644 "$source_dir/keyflip_app.py" /usr/libexec/keyflip/keyflip_app.py
+install -d /usr/libexec/keyflip/keyflip
+install -m 644 "$source_dir/src/keyflip/"*.py /usr/libexec/keyflip/keyflip/
+# Remove exact legacy module paths left by pre-package-layout manual installs.
+rm -f /usr/libexec/keyflip/keyflip_app.py /usr/libexec/keyflip/keyflip_cleaning.py \
+    /usr/libexec/keyflip/keyflip_state.py /usr/libexec/keyflip/keyflip_recovery.py \
+    /usr/libexec/keyflip/keyflip_sound.py
+install -m 644 "$source_dir/assets/sounds/cleaning-key.wav" /usr/share/keyflip/sounds/
+install -Dm644 "$source_dir/packaging/systemd/keyflip-recovery.service" /usr/lib/systemd/system/keyflip-recovery.service
+systemctl daemon-reload
 install -m 755 "$source_dir/keyflip" /usr/local/bin/keyflip
 install -m 644 "$source_dir/assets/keyflip.png" \
     /usr/local/share/icons/hicolor/512x512/apps/io.github.miflow13.KeyFlip.png

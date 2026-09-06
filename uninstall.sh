@@ -22,11 +22,30 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+# Restore before removing either the recovery executable or its service.
+# Abort removal if the kernel cannot confirm recovery; leave the service intact.
+if [[ -f /usr/libexec/keyflip/keyflip/recovery.py ]]; then
+    /usr/bin/python3 -I /usr/libexec/keyflip/keyflip/recovery.py restore
+    [[ ! -e /run/keyflip/desk.json ]] || {
+        echo 'Keyboard recovery is pending. End Cleaning Mode and retry uninstall.' >&2
+        exit 1
+    }
+fi
+if [[ -f /usr/lib/systemd/system/keyflip-recovery.service ]]; then
+    systemctl stop keyflip-recovery.service
+    [[ ! -e /run/keyflip/desk.json ]] || { echo 'Keyboard recovery is pending; uninstall stopped.' >&2; exit 1; }
+    rm -f /usr/lib/systemd/system/keyflip-recovery.service
+    systemctl daemon-reload
+fi
 rm -f /usr/local/bin/keyflip
 rm -f /usr/local/share/applications/io.github.miflow13.KeyFlip.desktop
 rm -f /usr/local/share/icons/hicolor/512x512/apps/io.github.miflow13.KeyFlip.png
 rm -f /usr/local/share/metainfo/io.github.miflow13.KeyFlip.metainfo.xml
-rm -f /usr/libexec/keyflip/app.py /usr/libexec/keyflip/keyflip_app.py
+rm -f /usr/libexec/keyflip/app.py
+rm -rf /usr/libexec/keyflip/keyflip
+rm -f /usr/libexec/keyflip/keyflip_app.py /usr/libexec/keyflip/keyflip_cleaning.py \
+    /usr/libexec/keyflip/keyflip_state.py /usr/libexec/keyflip/keyflip_recovery.py \
+    /usr/libexec/keyflip/keyflip_sound.py
 rm -rf /usr/share/gnome-shell/extensions/keyflip@miflow13.github.io
 rm -f /usr/share/glib-2.0/schemas/io.github.miflow13.KeyFlip.gschema.xml
 glib-compile-schemas /usr/share/glib-2.0/schemas

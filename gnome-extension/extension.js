@@ -14,6 +14,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 const HELPER = '/usr/libexec/keyflip/keyflip-helper';
 const APP = '/usr/libexec/keyflip/app.py';
+const STATE = '/usr/libexec/keyflip/keyflip/state.py';
 const SOUND_DIR = '/usr/share/keyflip/sounds';
 const SETTINGS_SCHEMA = 'io.github.miflow13.KeyFlip';
 const TOGGLE_KEYBINDING = 'toggle-mode-shortcut';
@@ -45,56 +46,118 @@ class KeyFlipIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(this._modeLabel);
         this._laptopAction = this.menu.addAction('Laptop Mode', () => this._requestEnabled(true));
         this._deskAction = this.menu.addAction('Desk Mode', () => this._requestEnabled(false));
+        this._cleaningAction = this.menu.addAction('Cleaning Mode', () => this._toggleCleaning());
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this.menu.addAction('Open KeyFlip', () => this._openApp());
         this.menu.addAction('Preferences', () => this._runApp('--preferences'));
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this._quitAction = this.menu.addAction('Quit', () => this._quit());
-        this._syncMenu();
-        this._refresh();
         this._externalKeyboardIds = new Set();
-        this._externalKeyboardKnown = false;
         this._disconnectChecks = 0;
-        this._checkExternalKeyboard();
-        this._statusTimer = GLib.timeout_add_seconds(
-            GLib.PRIORITY_DEFAULT,
-            1,
-            () => {
-                if (!this._busy && !this._statusCheckRunning) {
-                    this._statusCheckRunning = true;
-                    this._refresh().finally(() => {
-                        this._statusCheckRunning = false;
-                    });
-                }
-                return GLib.SOURCE_CONTINUE;
-            }
-        );
-        this._deviceTimer = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT,
-            500,
-            () => {
-                if (!this._deviceCheckRunning) {
-                    this._deviceCheckRunning = true;
-                    this._checkExternalKeyboard().finally(() => {
-                        this._deviceCheckRunning = false;
-                    });
-                }
-                return GLib.SOURCE_CONTINUE;
-            }
-        );
+        this._mutationSerial = 0;
+        this._cancellable = new Gio.Cancellable();
+        this._settingsChangedId = this._settings.connect('changed::automatic-mode-switching', () => {
+            this._refreshExternal();
+        });
+        this._syncMenu();
+        this._startWatcher();
         this.connect('destroy', () => {
             this._destroyed = true;
             this._disableDialog?.destroy();
             this._disableDialog = null;
-            if (this._statusTimer) {
-                GLib.source_remove(this._statusTimer);
-                this._statusTimer = null;
+            this._cancellable.cancel();
+            this._watcher?.force_exit();
+            this._settings.disconnect(this._settingsChangedId);
+            for (const timer of [this._restartTimer, this._disconnectTimer, this._retryTimer, this._osdTimer]) {
+                if (timer)
+                    GLib.source_remove(timer);
             }
-            if (this._deviceTimer) {
-                GLib.source_remove(this._deviceTimer);
-                this._deviceTimer = null;
-            }
+            this._restoreOsd?.();
+
         });
+    }
+
+    _startWatcher() {
+        if (this._destroyed)
+            return;
+        try {
+            this._watcher = Gio.Subprocess.new(['/usr/bin/python3', STATE, '--watch'],
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
+            const stream = new Gio.DataInputStream({base_stream: this._watcher.get_stdout_pipe()});
+            const read = () => stream.read_line_async(GLib.PRIORITY_DEFAULT, this._cancellable, (source, result) => {
+                if (this._destroyed)
+                    return;
+                try {
+                    const [line] = source.read_line_finish_utf8(result);
+                    if (line === null)
+                        throw new Error('Input monitor stopped');
+                    this._applySnapshot(JSON.parse(line));
+                    read();
+                } catch (error) {
+                    this._watchFailed(error);
+                }
+            });
+            read();
+        } catch (error) {
+            this._watchFailed(error);
+        }
+    }
+
+    _watchFailed(error) {
+        if (this._destroyed)
+            return;
+        this._watcher?.force_exit();
+        this._enabled = undefined;
+        this._syncMenu();
+        if (!this._restartTimer) {
+            Main.notify('KeyFlip input monitoring stopped', error.message);
+            this._restartTimer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 5, () => {
+                this._restartTimer = null;
+                this._startWatcher();
+                return GLib.SOURCE_REMOVE;
+            });
+        }
+    }
+
+    _applySnapshot(state) {
+        if (this._destroyed)
+            return;
+        this._cleaning = state.cleaning;
+        if (!this._busy)
+            this._enabled = typeof state.enabled === 'boolean' ? state.enabled : undefined;
+        this._renderState(state.error);
+        this._checkExternalKeyboard(state);
+    }
+
+    _renderState(error = '') {
+        this._keyboardIcon.gicon = null;
+        if (this._cleaning) {
+            this._keyboardIcon.icon_name = 'edit-clear-all-symbolic';
+            this.accessible_name = 'KeyFlip: Cleaning Mode active';
+        } else if (typeof this._enabled !== 'boolean') {
+            this._keyboardIcon.icon_name = 'dialog-error-symbolic';
+            this.accessible_name = `KeyFlip: ${error || 'keyboard status unavailable'}`;
+        } else {
+            this._keyboardIcon.icon_name = null;
+            this._keyboardIcon.gicon = Gio.icon_new_for_string(
+                `${this._extensionPath}/keyboard-${this._enabled ? 'enabled' : 'disabled'}.svg`);
+            this.accessible_name = `Internal keyboard ${this._enabled ? 'enabled' : 'disabled'}`;
+        }
+        this._syncMenu();
+    }
+
+    async _toggleCleaning() {
+        if (this._busy || this._requestPending || this._quitting || this._disableDialog)
+            return;
+        this._requestPending = true;
+        this._syncMenu();
+        try {
+            await this._runApp(this._cleaning ? '--end-cleaning' : '--cleaning');
+        } finally {
+            this._requestPending = false;
+            if (!this._destroyed)
+                this._syncMenu();
+        }
     }
 
     _runAsync(argv) {
@@ -110,7 +173,7 @@ class KeyFlipIndicator extends PanelMenu.Button {
                 return;
             }
 
-            process.communicate_utf8_async(null, null, (source, result) => {
+            process.communicate_utf8_async(null, this._cancellable, (source, result) => {
                 try {
                     const [, stdout, stderr] = source.communicate_utf8_finish(result);
                     resolve([
@@ -125,39 +188,30 @@ class KeyFlipIndicator extends PanelMenu.Button {
     }
 
     async _refresh() {
+        const serial = this._mutationSerial;
         const [success, output] = await this._runAsync([HELPER, 'status']);
-        if (this._destroyed)
+        if (this._destroyed || serial !== this._mutationSerial)
             return;
-        if (!success) {
-            this._enabled = undefined;
-            this._keyboardIcon.gicon = null;
-            this._keyboardIcon.icon_name = 'dialog-error-symbolic';
-            this.accessible_name = `KeyFlip: ${output || 'status unavailable'}`;
-            this._syncMenu();
-            return;
-        }
-
-        this._enabled = output.includes('enabled');
-        this._keyboardIcon.icon_name = null;
-        this._keyboardIcon.gicon = Gio.icon_new_for_string(
-            `${this._extensionPath}/keyboard-${this._enabled ? 'enabled' : 'disabled'}.svg`
-        );
-        this.accessible_name = `Internal keyboard ${this._enabled ? 'enabled' : 'disabled'}`;
-        this._syncMenu();
+        this._enabled = success && /^Internal keyboard: (enabled|disabled)\b/.test(output) ?
+            output.startsWith('Internal keyboard: enabled') : undefined;
+        this._renderState(success ? '' : output);
     }
 
     _syncMenu() {
         const available = typeof this._enabled === 'boolean';
-        this._modeLabel.label.text = !available ? 'Keyboard unavailable' :
+        this._modeLabel.label.text = this._cleaning ? 'Cleaning Mode active' : !available ? 'Keyboard unavailable' :
             (this._enabled ? 'Laptop Mode active' : 'Desk Mode active');
         const idle = !this._busy && !this._requestPending && !this._quitting;
-        const canChange = available && idle;
+        const canChange = available && idle && !this._cleaning;
+        this._cleaningAction.label.text = this._cleaning ? 'End Cleaning' : 'Cleaning Mode';
+        this._cleaningAction.setSensitive(idle && !this._disableDialog);
+        this._cleaningAction.setOrnament(this._cleaning ? PopupMenu.Ornament.DOT : PopupMenu.Ornament.NONE);
         this._quitAction.setSensitive(idle && !this._disableDialog);
         this._laptopAction.setSensitive(canChange);
         this._deskAction.setSensitive(canChange);
-        this._laptopAction.setOrnament(this._enabled === true ?
+        this._laptopAction.setOrnament(!this._cleaning && this._enabled === true ?
             PopupMenu.Ornament.DOT : PopupMenu.Ornament.NONE);
-        this._deskAction.setOrnament(this._enabled === false ?
+        this._deskAction.setOrnament(!this._cleaning && this._enabled === false ?
             PopupMenu.Ornament.DOT : PopupMenu.Ornament.NONE);
     }
 
@@ -181,9 +235,7 @@ class KeyFlipIndicator extends PanelMenu.Button {
             return;
         this._quitting = true;
         this._syncMenu();
-        const accepted = await this._runApp('--quit');
-        if (accepted)
-            this._stopBackground();
+        await this._runApp('--quit');
         if (!this._destroyed) {
             this._quitting = false;
             this._syncMenu();
@@ -195,7 +247,7 @@ class KeyFlipIndicator extends PanelMenu.Button {
     }
 
     async _requestEnabled(enabling) {
-        if (this._destroyed || this._busy || this._requestPending || this._quitting || this._disableDialog ||
+        if (this._destroyed || this._cleaning || this._busy || this._requestPending || this._quitting || this._disableDialog ||
             typeof this._enabled !== 'boolean' || enabling === this._enabled)
             return;
 
@@ -256,8 +308,9 @@ class KeyFlipIndicator extends PanelMenu.Button {
         dialog.open();
     }
 
-    async _checkExternalKeyboard() {
-        const [success, output] = await this._runAsync([HELPER, 'external-list']);
+    async _checkExternalKeyboard(state = null) {
+        const [success, output] = state === null ? await this._runAsync([HELPER, 'external-list']) :
+            [Array.isArray(state.external), (state.external || []).join('\n')];
         if (this._destroyed)
             return;
         if (!success)
@@ -265,37 +318,52 @@ class KeyFlipIndicator extends PanelMenu.Button {
 
         const keyboardIds = new Set(output ? output.split('\n') : []);
         const connected = keyboardIds.size > 0;
-        const wasKnown = this._externalKeyboardKnown;
         const wasConnected = this._externalKeyboardIds.size > 0;
-        if (!connected && wasKnown && wasConnected) {
+        if (!connected && (wasConnected || this._settings.get_boolean('automatic-disable-owned'))) {
             this._disconnectChecks++;
-            if (this._disconnectChecks < 2)
+            if (this._disconnectChecks < 2) {
+                if (!this._disconnectTimer) {
+                    this._disconnectTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 750, () => {
+                        this._disconnectTimer = null;
+                        this._refreshExternal();
+                        return GLib.SOURCE_REMOVE;
+                    });
+                }
                 return;
+            }
         } else {
             this._disconnectChecks = 0;
         }
-        this._externalKeyboardKnown = true;
         this._externalKeyboardIds = keyboardIds;
 
         if (!this._settings.get_boolean('automatic-mode-switching'))
             return;
 
-        if (this._busy || this._requestPending || this._quitting || this._disableDialog)
+        if (this._cleaning || this._busy || this._requestPending || this._quitting || this._disableDialog)
             return;
 
         if (connected && this._enabled) {
             this._setEnabled(false, true);
         }
-        else if (!connected && wasKnown && wasConnected &&
+        else if (!connected &&
                  this._settings.get_boolean('automatic-disable-owned') &&
-                 !this._enabled && !this._busy)
+                 this._enabled === false && !this._busy)
             this._setEnabled(true, true);
     }
 
+    async _refreshExternal() {
+        if (!this._destroyed)
+            await this._checkExternalKeyboard();
+    }
+
     async _setEnabled(enabling, automatic = false) {
+        if (this._destroyed || this._busy || this._cleaning)
+            return;
+        this._mutationSerial++;
         this._busy = true;
+        if (automatic && !enabling)
+            this._settings.set_boolean('automatic-disable-owned', true);
         this._syncMenu();
-        this._playSound(enabling);
         this._playToggleAnimation();
         this._keyboardIcon.opacity = 130;
 
@@ -312,18 +380,28 @@ class KeyFlipIndicator extends PanelMenu.Button {
             return;
         this._busy = false;
         this._syncMenu();
-        if (success) {
+        if (success && this._enabled === enabling) {
+            this._playSound(enabling);
             if (automatic)
                 this._settings.set_boolean('automatic-disable-owned', !enabling);
             this._showStatus(enabling);
         } else {
-            if (automatic)
+            if (automatic && !enabling && this._enabled === true)
                 this._settings.set_boolean('automatic-disable-owned', false);
             Main.notify(
                 automatic ? `KeyFlip could not auto-${enabling ? 'enable' : 'disable'} the keyboard` :
                     'KeyFlip could not change the keyboard',
-                output
+                output || 'The requested keyboard state could not be verified. Try Laptop Mode to restore input.'
             );
+        }
+        // Re-evaluate current devices after a busy transition; do not depend on
+        // an already-consumed disconnect edge. Back off failed automatic work.
+        if (!this._retryTimer) {
+            this._retryTimer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 5, () => {
+                this._retryTimer = null;
+                this._refreshExternal();
+                return GLib.SOURCE_REMOVE;
+            });
         }
     }
 
@@ -369,8 +447,15 @@ class KeyFlipIndicator extends PanelMenu.Button {
             showOsd.call(osdManager, monitorIndex, icon, label, null);
 
             if (osdWindow) {
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2500, () => {
-                    osdWindow.y_align = previousAlignment;
+                if (this._osdTimer) {
+                    GLib.source_remove(this._osdTimer);
+                    this._restoreOsd?.();
+                }
+                this._restoreOsd = () => { osdWindow.y_align = previousAlignment; };
+                this._osdTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2500, () => {
+                    this._restoreOsd();
+                    this._restoreOsd = null;
+                    this._osdTimer = null;
                     return GLib.SOURCE_REMOVE;
                 });
             }

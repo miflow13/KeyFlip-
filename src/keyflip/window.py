@@ -1,8 +1,11 @@
 
 import subprocess
-import sys
 import threading
+import time
 from pathlib import Path
+
+from .state import StateMonitor, snapshot
+from .sound import SoundPlayer
 
 import gi
 
@@ -13,9 +16,13 @@ from gi.repository import Gdk, Gio, GLib, Gtk, Pango
 
 APP_NAME = "KeyFlip"
 VERSION = "0.2.0-beta"
-SCRIPT = Path(__file__).resolve().with_name("keyflip-helper")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+INSTALL_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = INSTALL_ROOT / "keyflip-helper"
+if not SCRIPT.is_file():
+    SCRIPT = PROJECT_ROOT / "helper" / "keyflip-helper"
 INSTALLED_SOUND_DIR = Path("/usr/share/keyflip/sounds")
-SOURCE_SOUND_DIR = Path(__file__).resolve().parent / "assets" / "sounds"
+SOURCE_SOUND_DIR = PROJECT_ROOT / "assets" / "sounds"
 SOUND_DIR = INSTALLED_SOUND_DIR if INSTALLED_SOUND_DIR.is_dir() else SOURCE_SOUND_DIR
 PKEXEC = "/usr/bin/pkexec"
 SETTINGS_SCHEMA = "io.github.miflow13.KeyFlip"
@@ -26,7 +33,9 @@ class PreferencesWindow(Gtk.Window):
         super().__init__(title="KeyFlip Preferences", transient_for=parent,
                          application=parent.get_application(), modal=True, resizable=False)
         self.set_default_size(460, -1)
-        self.set_titlebar(Gtk.HeaderBar())
+        header = Gtk.HeaderBar()
+        header.add_css_class("app-header")
+        self.set_titlebar(header)
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
         for side in ("top", "bottom", "start", "end"):
             getattr(content, f"set_margin_{side}")(24)
@@ -35,6 +44,7 @@ class PreferencesWindow(Gtk.Window):
         label.add_css_class("title-3")
         row.append(label)
         automatic = Gtk.Switch(valign=Gtk.Align.CENTER)
+        automatic.add_css_class("automatic-switch")
         parent.settings.bind("automatic-mode-switching", automatic, "active", Gio.SettingsBindFlags.DEFAULT)
         automatic.connect("notify::active", parent.on_automatic_switch_changed)
         row.append(automatic)
@@ -71,31 +81,27 @@ class KeyboardWindow(Gtk.ApplicationWindow):
 
         header = Gtk.HeaderBar()
         header.add_css_class("app-header")
-        header_title = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        header_icon = Gtk.Image.new_from_icon_name("input-keyboard-symbolic")
-        header_icon.set_pixel_size(24)
-        header_icon.add_css_class("header-icon")
-        header_title.append(header_icon)
-        header_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        heading = Gtk.Label(label=APP_NAME, xalign=0)
-        heading.add_css_class("title-1")
-        subtitle = Gtk.Label(label="Laptop keyboard control", xalign=0)
-        subtitle.add_css_class("dim-label")
-        header_text.append(heading)
-        header_text.append(subtitle)
-        header_title.append(header_text)
-        header.pack_start(header_title)
+        source_logo = PROJECT_ROOT / "assets" / "keyflip.png"
+        if source_logo.is_file():
+            header_icon = Gtk.Image.new_from_file(str(source_logo))
+        else:
+            header_icon = Gtk.Image.new_from_icon_name("io.github.miflow13.KeyFlip")
+        header_icon.set_pixel_size(40)
+        header_icon.set_margin_top(4)
+        header_icon.set_margin_bottom(4)
+        header_icon.set_tooltip_text(APP_NAME)
+        header.set_title_widget(header_icon)
         self.refresh_button = Gtk.Button.new_from_icon_name("view-refresh-symbolic")
         self.refresh_button.add_css_class("flat")
         self.refresh_button.add_css_class("circular")
         self.refresh_button.set_tooltip_text("Refresh keyboard status")
         self.refresh_button.connect("clicked", lambda _: self.refresh_status())
-        header.pack_end(self.refresh_button)
+        header.pack_start(self.refresh_button)
         preferences_button = Gtk.Button.new_from_icon_name("emblem-system-symbolic")
         preferences_button.add_css_class("flat")
         preferences_button.set_tooltip_text("Preferences")
         preferences_button.connect("clicked", lambda _button: self.show_preferences())
-        header.pack_end(preferences_button)
+        header.pack_start(preferences_button)
         self.set_titlebar(header)
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
@@ -118,6 +124,11 @@ class KeyboardWindow(Gtk.ApplicationWindow):
             "input-keyboard-symbolic", "Desk Mode", "Built-in keyboard off"
         )
         self.desk_mode_button.set_group(self.laptop_mode_button)
+        self.cleaning_mode_button = self.create_mode_button(
+            "edit-clear-all-symbolic", "Cleaning Mode", "All keyboards off · 60s"
+        )
+        self.cleaning_mode_button.set_group(self.laptop_mode_button)
+        self.cleaning_mode_button.connect("toggled", self.on_cleaning_selected)
         self.laptop_mode_button.connect(
             "toggled", self.on_mode_selected, True
         )
@@ -126,7 +137,14 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         )
         mode_selector.append(self.laptop_mode_button)
         mode_selector.append(self.desk_mode_button)
+        mode_selector.append(self.cleaning_mode_button)
         outer.append(mode_selector)
+
+        self.end_cleaning_button = Gtk.Button(label="End Cleaning")
+        self.end_cleaning_button.add_css_class("suggested-action")
+        self.end_cleaning_button.set_visible(False)
+        self.end_cleaning_button.connect("clicked", lambda _button: self.end_cleaning())
+        outer.append(self.end_cleaning_button)
 
         self.status_frame = Gtk.Frame()
         self.status_frame.add_css_class("device-card")
@@ -220,6 +238,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         self.automatic_switch = Gtk.Switch(
             active=self.settings.get_boolean("automatic-mode-switching")
         )
+        self.automatic_switch.add_css_class("automatic-switch")
         self.automatic_switch.set_valign(Gtk.Align.CENTER)
         self.automatic_switch.connect("notify::active", self.on_automatic_switch_changed)
         self.settings.bind("automatic-mode-switching", self.automatic_switch, "active", Gio.SettingsBindFlags.GET)
@@ -239,6 +258,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         )
         safety_label.set_wrap(True)
         safety_label.set_hexpand(True)
+        self.safety_label = safety_label
         safety_box.append(safety_label)
         outer.append(safety_box)
 
@@ -246,11 +266,18 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         self.keyboard_enabled = None
         self.updating_mode = False
         self.busy = False
-        self.refreshing = False
         self.safety_dialog = None
         self.preferences_window = None
-        self.refresh_status()
-        self.status_timer = GLib.timeout_add_seconds(1, self.sync_status)
+        self.cleaning_process = None
+        self.cleaning_stop = None
+        self.cleaning_done = None
+        self.cleaning_deadline = None
+        self.status_pause_until = 0
+        self.closed = False
+        self.sound_player = SoundPlayer()
+        self.status_timer = None
+        self.error_timer = None
+        self.state_monitor = StateMonitor(self.apply_snapshot)
         self.connect("close-request", self.stop_status_sync)
 
     def show_preferences(self):
@@ -282,6 +309,15 @@ class KeyboardWindow(Gtk.ApplicationWindow):
 
     @staticmethod
     def run_command(*arguments, privileged=False):
+        if not privileged and arguments in (("status",), ("external-list",)):
+            state = snapshot()
+            if arguments == ("status",):
+                ok = state['enabled'] is not None
+                output = ('Internal keyboard: ' + ('enabled' if state['enabled'] else 'disabled')) if ok else state['error']
+            else:
+                ok = state['external'] is not None
+                output = '\n'.join(state['external']) if ok else state['external_error']
+            return subprocess.CompletedProcess(arguments, 0 if ok else 1, output if ok else '', '' if ok else output)
         command = [str(SCRIPT), *arguments]
         if privileged:
             command.insert(0, PKEXEC)
@@ -298,35 +334,50 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         self.busy = busy
         self.laptop_mode_button.set_sensitive(not busy)
         self.desk_mode_button.set_sensitive(not busy)
+        self.cleaning_mode_button.set_sensitive(not busy)
         self.keyboard_switch.set_sensitive(not busy)
         self.refresh_button.set_sensitive(not busy)
         if busy:
             self.device_state.set_text("Applying…")
 
     def sync_status(self):
-        if not self.busy:
-            self.refresh_status()
+        if self.cleaning_deadline is not None:
+            remaining = max(0, int(self.cleaning_deadline - time.monotonic()) + 1)
+            self.detail_label.set_text(
+                f"All keyboards blocked. Mouse and trackpad remain usable. Restoring in {remaining}s."
+            )
         return GLib.SOURCE_CONTINUE
 
     def stop_status_sync(self, _window):
+        self.closed = True
+        self.state_monitor.close()
+        self.sound_player.close()
+        if self.error_timer is not None:
+            GLib.source_remove(self.error_timer)
+            self.error_timer = None
+        self.end_cleaning()
         if self.status_timer:
             GLib.source_remove(self.status_timer)
             self.status_timer = None
         return False
 
     def refresh_status(self):
-        if self.refreshing or self.busy:
-            return
-        self.refreshing = True
-        threading.Thread(target=self.finish_status_refresh, daemon=True).start()
+        if not self.closed and not self.busy and time.monotonic() >= self.status_pause_until:
+            self.state_monitor.refresh(force=True)
 
-    def finish_status_refresh(self):
-        result = self.run_command("status")
-        external = self.run_command("external-list")
-        GLib.idle_add(self.apply_status_refresh, result, external)
+    def apply_snapshot(self, state):
+        if self.closed or self.busy or time.monotonic() < self.status_pause_until:
+            return
+        enabled = state['enabled']
+        result = subprocess.CompletedProcess([], 1 if enabled is None else 0,
+            ('Internal keyboard: ' + ('enabled' if enabled else 'disabled')) if enabled is not None else '', state['error'])
+        external = subprocess.CompletedProcess([], 1 if state['external'] is None else 0,
+            '\n'.join(state['external'] or []), state['external_error'])
+        self.apply_status_refresh(result, external)
 
     def apply_status_refresh(self, result, external):
-        self.refreshing = False
+        if self.busy:
+            return GLib.SOURCE_REMOVE
         external_connected = external.returncode == 0 and bool(external.stdout.strip())
         self.external_badge.set_visible(external_connected)
         message = self.result_message(result)
@@ -379,12 +430,15 @@ class KeyboardWindow(Gtk.ApplicationWindow):
         self.updating_mode = True
         self.laptop_mode_button.set_active(bool(self.keyboard_enabled))
         self.desk_mode_button.set_active(self.keyboard_enabled is False)
+        self.cleaning_mode_button.set_active(False)
         self.keyboard_switch.set_active(bool(self.keyboard_enabled))
         self.keyboard_switch.set_state(bool(self.keyboard_enabled))
         self.updating_mode = False
 
     def on_mode_selected(self, button, keyboard_enabled):
         if self.updating_mode or not button.get_active():
+            return
+        if self.busy:
             return
         if self.keyboard_enabled is None:
             self.refresh_status()
@@ -393,6 +447,108 @@ class KeyboardWindow(Gtk.ApplicationWindow):
             return
 
         self.request_keyboard_state(keyboard_enabled)
+
+    def on_cleaning_selected(self, button):
+        if self.updating_mode or not button.get_active() or self.busy:
+            return
+        self.close_safety_dialog()
+        self.cleaning_stop = threading.Event()
+        self.cleaning_done = threading.Event()
+        self.automatic_switch.set_sensitive(False)
+        self.set_busy(True)
+        self.end_cleaning_button.set_visible(True)
+        self.end_cleaning_button.set_sensitive(True)
+        self.state_label.set_text("Starting Cleaning Mode…")
+        self.detail_label.set_text("Release all keys. Keyboards will restore automatically after 60 seconds.")
+        self.status_frame.remove_css_class("error")
+        self.safety_label.set_text("Use End Cleaning to restore input early. Closing this window also ends cleaning.")
+        threading.Thread(target=self.run_cleaning, daemon=True).start()
+
+    def run_cleaning(self):
+        process = None
+        try:
+            process = subprocess.Popen(
+                [PKEXEC, str(SCRIPT), "clean"], stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            )
+            self.cleaning_process = process
+            if self.cleaning_stop.is_set():
+                process.stdin.close()
+            messages = []
+            for line in process.stdout:
+                if line.strip() == "READY":
+                    GLib.idle_add(self.cleaning_started)
+                elif line.strip() == "KEY":
+                    GLib.idle_add(self.cleaning_key_sound)
+                else:
+                    messages.append(line)
+            output = ''.join(messages)
+            returncode = process.wait()
+        except OSError as error:
+            returncode, output = 1, str(error)
+        finally:
+            if process is not None:
+                process.stdin.close()
+                process.stdout.close()
+            self.cleaning_done.set()
+        GLib.idle_add(self.cleaning_finished, returncode, output.strip())
+
+    def cleaning_key_sound(self):
+        if not self.closed and self.cleaning_stop is not None and not self.cleaning_stop.is_set():
+            self.sound_player.play(SOUND_DIR / 'cleaning-key.wav')
+        return GLib.SOURCE_REMOVE
+
+    def cleaning_started(self):
+        if self.cleaning_stop is None or self.cleaning_stop.is_set():
+            return GLib.SOURCE_REMOVE
+        self.cleaning_deadline = time.monotonic() + 60
+        self.status_timer = GLib.timeout_add_seconds(1, self.sync_status)
+        self.state_label.set_text("Cleaning Mode active")
+        self.state_label.remove_css_class("state-enabled")
+        self.state_label.remove_css_class("state-disabled")
+        self.status_icon.set_from_icon_name("edit-clear-all-symbolic")
+        self.status_badge.set_visible(False)
+        self.device_state.set_text("Cleaning")
+        self.sync_status()
+        return GLib.SOURCE_REMOVE
+
+    def end_cleaning(self):
+        if self.cleaning_stop is not None:
+            self.cleaning_stop.set()
+            self.end_cleaning_button.set_sensitive(False)
+        process = self.cleaning_process
+        if process is not None and process.stdin is not None:
+            process.stdin.close()
+
+    def cleaning_finished(self, returncode, message):
+        self.cleaning_process = None
+        self.cleaning_stop = None
+        self.cleaning_deadline = None
+        if self.status_timer is not None:
+            GLib.source_remove(self.status_timer)
+            self.status_timer = None
+        if self.closed or getattr(self.get_application(), "quitting", False):
+            return GLib.SOURCE_REMOVE
+        self.end_cleaning_button.set_visible(False)
+        self.automatic_switch.set_sensitive(True)
+        self.set_busy(False)
+        self.sync_mode_controls()
+        self.safety_label.set_text("Keep an external keyboard connected while this one is off.")
+        if returncode:
+            self.status_pause_until = time.monotonic() + 8
+            self.error_timer = GLib.timeout_add(8100, self.clear_error)
+            self.state_label.set_text("Cleaning Mode stopped")
+            self.detail_label.set_text(message or "Cleaning Mode could not start. Keyboards have been released.")
+            self.status_frame.add_css_class("error")
+        else:
+            self.refresh_status()
+        return GLib.SOURCE_REMOVE
+
+    def clear_error(self):
+        self.error_timer = None
+        self.status_pause_until = 0
+        self.refresh_status()
+        return GLib.SOURCE_REMOVE
 
     def on_keyboard_switch(self, _switch, keyboard_enabled):
         if self.updating_mode:
@@ -426,7 +582,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
                 GLib.idle_add(self.show_disable_warning)
                 return
 
-        self.start_toggle(action, keyboard_enabled)
+        self.start_toggle(action)
 
     def show_disable_warning(self):
         if self.safety_dialog is not None:
@@ -496,10 +652,9 @@ class KeyboardWindow(Gtk.ApplicationWindow):
     def confirm_unsafe_disable(self):
         self.close_safety_dialog()
         if self.keyboard_enabled:
-            self.start_toggle("disable", False)
+            self.start_toggle("disable")
 
-    def start_toggle(self, action, requested_state):
-        self.play_toggle_sound(requested_state)
+    def start_toggle(self, action):
         self.set_busy(True)
         threading.Thread(target=self.finish_toggle, args=(action,), daemon=True).start()
 
@@ -544,6 +699,7 @@ class KeyboardWindow(Gtk.ApplicationWindow):
     def show_toggle_result(self, returncode, message):
         self.set_busy(False)
         if returncode == 0:
+            self.play_toggle_sound(self.run_command("status").stdout.startswith("Internal keyboard: enabled"))
             self.refresh_status()
         else:
             self.state_label.set_text("Keyboard change failed")
@@ -567,12 +723,6 @@ def load_css():
         window, headerbar.app-header {
             background: @window_bg_color;
             color: @window_fg_color;
-        }
-        .header-icon {
-            color: @accent_color;
-            background: alpha(@accent_color, 0.14);
-            border-radius: 13px;
-            padding: 11px;
         }
         .section-label {
             font-weight: 700;
@@ -652,6 +802,18 @@ def load_css():
             color: @warning_color;
             opacity: 0.85;
         }
+        switch.automatic-switch {
+            background: alpha(@window_fg_color, 0.18);
+            border: 1px solid alpha(@window_fg_color, 0.32);
+        }
+        switch.automatic-switch:checked {
+            background: @accent_color;
+            border-color: @accent_color;
+        }
+        switch.automatic-switch slider {
+            background: white;
+            box-shadow: 0 1px 3px alpha(black, 0.35);
+        }
         .warning-dialog-icon { color: @warning_color; }
         button { border-radius: 10px; }
         .dim-label { opacity: 0.68; }
@@ -659,101 +821,3 @@ def load_css():
     Gtk.StyleContext.add_provider_for_display(
         Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
     )
-
-
-def on_activate(application):
-    if getattr(application, "quitting", False):
-        return None
-    window = next((window for window in application.get_windows()
-                   if isinstance(window, KeyboardWindow)), None)
-    if window is None:
-        load_css()
-        window = KeyboardWindow(application)
-    window.settings.set_boolean("background-enabled", True)
-    window.present()
-    return window
-
-
-def restore_keyboard_for_quit():
-    status = KeyboardWindow.run_command("status")
-    message = KeyboardWindow.result_message(status)
-    if status.returncode != 0:
-        # A desktop with unsupported hardware still needs to be able to quit.
-        if "No single supported i8042 internal keyboard found" in message:
-            return None
-        return message or "The keyboard status could not be checked."
-    if "enabled" in message:
-        return None
-    result = KeyboardWindow.run_command("enable", privileged=True)
-    if result.returncode != 0:
-        return KeyboardWindow.result_message(result) or "Restoring Laptop Mode was cancelled or failed."
-    status = KeyboardWindow.run_command("status")
-    if status.returncode != 0 or "enabled" not in KeyboardWindow.result_message(status):
-        return "The internal keyboard could not be confirmed enabled."
-    return None
-
-
-def request_quit(application):
-    application.quitting = True
-    application.hold()
-    settings = Gio.Settings.new(SETTINGS_SCHEMA)
-    settings.set_boolean("background-enabled", False)
-    Gio.Settings.sync()
-    for window in application.get_windows():
-        if isinstance(window, KeyboardWindow):
-            window.close_safety_dialog()
-            window.set_busy(True)
-
-    def complete(error):
-        application.quitting = False
-        if error:
-            window = on_activate(application)
-            window.set_busy(False)
-            window.show_toggle_result(1, f"KeyFlip is still running because Laptop Mode could not be restored. {error}")
-        else:
-            settings.set_boolean("automatic-disable-owned", False)
-            Gio.Settings.sync()
-            application.quit()
-        application.release()
-        return GLib.SOURCE_REMOVE
-
-    def restore():
-        try:
-            error = restore_keyboard_for_quit()
-        except Exception as error:
-            GLib.idle_add(complete, str(error))
-        else:
-            GLib.idle_add(complete, error)
-
-    threading.Thread(target=restore, daemon=True).start()
-
-
-def on_command_line(application, command_line):
-    options = command_line.get_options_dict()
-    arguments = command_line.get_arguments()
-    if getattr(application, "quitting", False):
-        command_line.printerr_literal("KeyFlip is restoring Laptop Mode before quitting.\n")
-        return 1
-    if options.contains("quit") or "--quit" in arguments:
-        # Do not exit while the GUI is applying a keyboard change.
-        if any(getattr(window, "busy", False) for window in application.get_windows()):
-            command_line.printerr_literal("KeyFlip is changing modes. Try Quit again once it finishes.\n")
-            return 1
-        request_quit(application)
-        return 0
-    window = on_activate(application)
-    if options.contains("preferences") or "--preferences" in arguments:
-        window.show_preferences()
-    return 0
-
-
-app = Gtk.Application(application_id="io.github.miflow13.KeyFlip",
-                      flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
-for option, description in (("preferences", "Open Preferences"), ("quit", "Quit KeyFlip")):
-    app.add_main_option(option, 0, GLib.OptionFlags.NONE, GLib.OptionArg.NONE, description, None)
-app.connect("activate", on_activate)
-app.connect("command-line", on_command_line)
-
-
-if __name__ == "__main__":
-    sys.exit(app.run(sys.argv))

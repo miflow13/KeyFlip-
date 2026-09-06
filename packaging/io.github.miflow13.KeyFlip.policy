@@ -6,8 +6,8 @@
   <vendor>KeyFlip</vendor>
   <vendor_url>https://github.com/miflow13/KeyFlip-</vendor_url>
   <action id="io.github.miflow13.KeyFlip.toggle">
-    <description>Enable or disable the internal laptop keyboard</description>
-    <message>Permission is required to change the internal keyboard state</message>
+    <description>Control keyboard modes, including temporary all-keyboard cleaning</description>
+    <message>Permission is required to change keyboard input mode</message>
     <defaults>
       <allow_any>no</allow_any>
       <allow_inactive>no</allow_inactive>

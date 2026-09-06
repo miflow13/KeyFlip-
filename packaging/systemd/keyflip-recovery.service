@@ -1,0 +1,10 @@
+[Unit]
+Description=KeyFlip internal keyboard recovery
+After=systemd-logind.service
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/python3 -I /usr/libexec/keyflip/keyflip/recovery.py serve
+ExecStopPost=/usr/bin/python3 -I /usr/libexec/keyflip/keyflip/recovery.py restore
+Restart=on-failure
+RestartSec=1

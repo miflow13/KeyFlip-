@@ -5,45 +5,43 @@ set -euo pipefail
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
 
+helper_dir=$(dirname -- "$(readlink -f -- "$0")")
+if [[ -d $helper_dir/keyflip ]]; then
+    module_dir=$helper_dir/keyflip
+else
+    module_dir=$(readlink -f -- "$helper_dir/../src/keyflip")
+fi
+
 usage() {
-    echo 'Usage: sudo keyflip-helper {toggle|enable|disable|test|status|external-status|external-list}'
+    echo 'Usage: sudo keyflip-helper {toggle|enable|disable|test|status|external-status|external-list|clean}'
     echo 'test disables for about 15 seconds, then automatically enables.'
 }
 action=${1:-toggle}
 case "$action" in
-    toggle|enable|disable|test|status|external-status|external-list) ;;
+    toggle|enable|disable|test|status|external-status|external-list|clean) ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
 esac
 [[ $# -le 1 ]] || { usage >&2; exit 2; }
 
+if [[ $action == clean ]]; then
+    exec /usr/bin/python3 -I "$module_dir/cleaning.py"
+fi
+
 # This query is intentionally unprivileged so the desktop extension can watch
 # for hot-plugged keyboards without producing authentication prompts merely to
 # inspect input devices. udev identifies real keyboard devices and their bus.
 if [[ $action == external-status || $action == external-list ]]; then
-    connected=false
-    for event in /sys/class/input/event*; do
-        [[ -e $event ]] || continue
-        device_name=$(<"$event/device/name") || continue
-        # Some mice expose a keyboard endpoint for programmable/media buttons.
-        # They must not keep the laptop keyboard disabled.
-        [[ ${device_name,,} == *mouse* || ${device_name,,} == *touchpad* ]] && continue
-        properties=$(udevadm info --query=property --path="$event" 2>/dev/null) || continue
-        if [[ $properties == *$'ID_INPUT_KEYBOARD=1'* ]] &&
-           { [[ $properties == *$'ID_BUS=usb'* ]] ||
-             [[ $properties == *$'ID_BUS=bluetooth'* ]]; }; then
-            connected=true
-            if [[ $action == external-list ]]; then
-                # DEVPATH identifies the physical input endpoint and remains
-                # stable for the lifetime of this connection.
-                sed -n 's/^DEVPATH=//p' <<< "$properties"
-            else
-                break
-            fi
-        fi
-    done
-    if [[ $action == external-status ]]; then
-        echo "External keyboard: $($connected && echo connected || echo disconnected)"
+    if ! output=$(/usr/bin/python3 -I "$module_dir/state.py" --external); then
+        echo "$output" >&2
+        exit 1
+    fi
+    if [[ $action == external-list ]]; then
+        [[ -z $output ]] || printf '%s\n' "$output"
+    elif [[ -n $output ]]; then
+        echo 'External keyboard: connected'
+    else
+        echo 'External keyboard: disconnected'
     fi
     exit 0
 fi
@@ -89,7 +87,7 @@ fi
 }
 # Serialize changes, including the automatic restore.
 exec 9>/run/internal-keyboard-toggle.lock
-flock -x 9
+flock -xn 9 || { echo 'Another keyboard change or Cleaning Mode is active.' >&2; exit 1; }
 # Refresh state after acquiring the lock.
 if [[ -L "$port/driver" ]]; then state=enabled; else state=disabled; fi
 if [[ $action == toggle ]]; then
@@ -105,13 +103,22 @@ if [[ $action == test ]]; then
     printf '%s' "$id" > "$driver/unbind"
     echo 'Internal keyboard disabled. Automatic restore in about 15 seconds.'
 elif [[ $action == disable ]]; then
+    recovery_uid=${PKEXEC_UID:-${SUDO_UID:-0}}
+    [[ $recovery_uid =~ ^[0-9]+$ ]] || { echo 'Invalid recovery user.' >&2; exit 1; }
+    /usr/bin/python3 -I "$module_dir/recovery.py" arm "$recovery_uid" "$id"
     printf manual > "$port/bind_mode"
     [[ $state == disabled ]] || printf '%s' "$id" > "$driver/unbind"
-    echo 'Internal keyboard disabled. Use an external keyboard to enable it, or reboot.'
+    [[ ! -L "$port/driver" ]] || { echo 'The internal keyboard could not be confirmed disabled.' >&2; exit 1; }
+    echo 'Internal keyboard disabled. Recovery is active while KeyFlip runs.'
 else
     printf auto > "$port/bind_mode"
     # Changing back to auto normally binds atkbd synchronously. Explicitly bind
     # only when the kernel has not done so, since bind fails in manual mode.
     [[ -L "$port/driver" ]] || printf '%s' "$id" > "$driver/bind"
+    [[ -L "$port/driver" && $(readlink -f "$port/driver") == "$driver" ]] || {
+        echo 'The internal keyboard could not be confirmed enabled.' >&2
+        exit 1
+    }
+    /usr/bin/python3 -I "$module_dir/recovery.py" disarm
     echo 'Internal keyboard enabled.'
 fi

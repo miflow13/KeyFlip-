@@ -90,6 +90,10 @@ KeyFlip requires:
 * `systemd`
 * `python3-evdev` on Fedora or `python-evdev` on Arch for Cleaning Mode
 
+Development validation additionally uses Node.js, `desktop-file-validate`,
+`appstreamcli`, and `glib-compile-schemas`. These tools are not required merely
+to run an installed copy.
+
 ## How the modes work
 
 ### Laptop Mode

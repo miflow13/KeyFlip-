@@ -38,7 +38,7 @@ not part of the current implementation.
 
 ```text
 GTK application                 GNOME Shell extension
-keyflip_app.py                  gnome-extension/extension.js
+src/keyflip/                    gnome-extension/extension.js
         |                                   |
         | unprivileged status queries       | unprivileged status queries
         | privileged state changes          | privileged state changes
@@ -70,8 +70,12 @@ implementations from drifting apart.
 
 | Path | Responsibility |
 | --- | --- |
-| `keyflip-helper` | Low-level keyboard detection and state changes. |
-| `keyflip_app.py` | GTK 4 GUI and Laptop/Desk Mode workflow. |
+| `helper/keyflip-helper` | Low-level keyboard detection and state changes. |
+| `src/keyflip/application.py` | GTK lifecycle, command-line handling, and safe quit. |
+| `src/keyflip/window.py` | GTK windows and Laptop/Desk Mode interaction. |
+| `src/keyflip/state.py` | Read-only hardware state and event-coalesced monitoring. |
+| `src/keyflip/cleaning.py` | Privileged temporary input suppression. |
+| `src/keyflip/recovery.py` | Root-owned Desk Mode recovery. |
 | `app.py` | Small application entry point. |
 | `keyflip` | Launcher that finds the source or installed application. |
 | `gnome-extension/extension.js` | GNOME Shell panel interface and automation. |
@@ -261,17 +265,18 @@ helper, because the same hardware ID may be legitimate for another user.
 
 ## 8. GTK application flow
 
-`keyflip_app.py` uses GTK 4 through PyGObject.
+`src/keyflip/window.py` uses GTK 4 through PyGObject, while
+`src/keyflip/application.py` owns application lifecycle and command handling.
 
 ### Startup
 
-`app.py` imports the shared `Gtk.Application` object. On activation:
+`app.py` calls the application module's `run()` interface. On activation:
 
 1. Application CSS is registered.
 2. `KeyboardWindow` is created.
 3. The window builds the mode selector, status card, and safety note.
-4. `refresh_status()` asks the helper for the real keyboard state.
-5. A one-second timer keeps the UI synchronized.
+4. The state monitor reads the real hardware state directly without privilege.
+5. Filesystem events trigger refreshes, with a five-second fallback scan.
 
 ### Presets and source of truth
 
@@ -343,9 +348,10 @@ modules.
 ### Lifecycle
 
 `enable()` creates a `KeyFlipIndicator` and inserts it in the panel.
-`disable()` destroys it. The indicator's destroy handler removes both polling
-timers. Cleaning timers is essential because an extension can be reloaded many
-times in one Shell session.
+`disable()` destroys it. The indicator's destroy handler cancels the state
+watcher and removes pending debounce, retry, and OSD timers. Cleaning these
+resources is essential because an extension can be reloaded many times in one
+Shell session.
 
 The extension also registers `toggle-mode-shortcut` through `Main.wm.addKeybinding`
 on enable and removes it on disable. Its GSettings string-array default is
@@ -356,17 +362,14 @@ application windows and the overview, ignores key autorepeat, and calls the same
 feedback. Unsupported hardware disables the mode actions while leaving Open
 KeyFlip available. Opening the app again presents its existing window.
 
-### Polling
+### State monitoring
 
-The extension currently uses two timers:
-
-- Every 1 second: refresh internal keyboard status and icon.
-- Every 500 milliseconds: refresh the set of external keyboards.
-
-Polling is simple and robust, but it performs repeated subprocess and udev
-work. The subprocess calls are asynchronous so they do not block GNOME Shell's
-main thread. A future version could listen to udev events through a dedicated
-service instead.
+The extension starts one unprivileged Python state watcher. Gio directory
+monitors coalesce sysfs, input-device, udev-data, and runtime changes before
+emitting a fresh snapshot. A five-second verification timer covers sysfs
+changes that do not produce a useful file event and recovers from lost events.
+The Shell reads watcher output asynchronously, so state inspection does not
+block its main thread or repeatedly spawn helper processes.
 
 ### Automatic switching state
 
@@ -439,10 +442,10 @@ gnome-extensions enable keyflip@miflow13.github.io
 
 On Wayland, logging out and back in is the most reliable Shell reload.
 
-To prove whether source and installed GUI match:
+To compare source and installed GUI modules:
 
 ```bash
-sha256sum keyflip_app.py /usr/libexec/keyflip/keyflip_app.py
+diff -ru src/keyflip /usr/libexec/keyflip/keyflip
 ```
 
 Matching hashes mean the installed Python file is current.
@@ -455,9 +458,11 @@ Run the project checks before committing:
 make check
 ```
 
-This currently verifies:
+This verifies:
 
 - Python syntax compilation.
+- Python behavior tests.
+- GNOME panel logic tests.
 - Shell-script syntax.
 - Desktop entry validity.
 - AppStream metadata validity.
@@ -465,9 +470,9 @@ This currently verifies:
 Useful direct diagnostics:
 
 ```bash
-./keyflip-helper status
-./keyflip-helper external-status
-./keyflip-helper external-list
+./helper/keyflip-helper status
+./helper/keyflip-helper external-status
+./helper/keyflip-helper external-list
 ```
 
 Inspect all input endpoints udev considers keyboards:
@@ -504,8 +509,7 @@ This layered approach is much faster than repeatedly changing UI code.
 3. External-keyboard detection depends on udev classifications and can have
    false positives.
 4. The GUI's presets currently control only the internal keyboard.
-5. Both front ends poll by spawning helper processes, although that work is
-   performed asynchronously.
+5. State monitoring uses filesystem events with a five-second fallback scan.
 6. Some extension OSD behavior relies on private GNOME Shell internals.
 7. There is no automated integration test for real sysfs mutation.
 
@@ -533,11 +537,11 @@ Store user preferences in a GSettings schema, for example whether Desk Mode
 disables the touchpad. Keep policy decisions in settings and device operations
 in dedicated functions.
 
-### Stage 4: event-driven automation
+### Stage 4: monitor hardening
 
-Replace high-frequency polling with udev monitoring, likely in a small user
-service. Define recovery behavior carefully before moving automatic control out
-of the Shell extension.
+Add integration coverage for real udev and sysfs event sequences. Keep the
+fallback scan until supported systems demonstrate that every relevant kernel
+and udev transition reliably produces a monitored event.
 
 ### Stage 5: broader hardware support
 
@@ -568,3 +572,28 @@ KeyFlip is a compact example of several general software-engineering ideas:
 The central lesson is that the visible button is the smallest part of the
 system. A trustworthy input utility is primarily about explicit state,
 privilege boundaries, hardware validation, recovery, and honest limitations.
+
+## Cleaning Mode implementation
+
+`keyflip-helper clean` runs `src/keyflip/cleaning.py` with system Python in isolated
+mode. The authorized process holds the same lock as internal-keyboard changes,
+then uses python-evdev exclusive grabs on endpoints exposing `KEY_*` capabilities.
+Pointer-only endpoints are not grabbed. Combined endpoints get a uinput pointer
+proxy preserving button/axis capabilities and input properties; keyboard keys
+and keyboard scan events are discarded. Device scans run every 100 ms.
+
+The helper prints `READY` only after the initial grabs succeed. It releases all
+handles on setup/read errors, timeout, signals, or input-pipe activity/EOF.
+The GUI owns that pipe, so a GUI crash also ends the session. No persistent
+keyboard-driver changes are made. The shared lock rejects competing mode changes
+rather than allowing them to queue behind a cleaning session.
+
+The GUI pauses background operation while cleaning and restores that setting
+when cleaning finishes or the window closes. Opening the app after a crash
+resumes background operation through the usual activation path.
+
+Tests in `tests/test_cleaning.py` exercise device selection, combined pointer
+filtering, hotplug, partial failures, event overflow, early stop, and timeout
+using fake input endpoints. Real keyboard grabs and pointer proxy behavior need
+hardware testing before release. The evdev API is documented at
+https://python-evdev.readthedocs.io/en/latest/tutorial.html.
