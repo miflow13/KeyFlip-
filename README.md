@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/keyflip-logo.png" alt="KeyFlip logo" width="220" />
+  <img src="./assets/keyflip-logo.png" alt="KeyFlip logo" width="600" />
 </p>
 
 # KeyFlip
